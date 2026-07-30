@@ -1,6 +1,6 @@
 const CACHE_NAME = 'uno-flex-cache-v1';
 const ASSETS_TO_CACHE = [
-  './uno-zaehler.html',
+  './index.html',
   './manifest.json',
   './icon-192.png',
   './icon-512.png'

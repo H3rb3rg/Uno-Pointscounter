@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UNO Flex Punktezähler</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#e6362a">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="UNO Flex">
+<style>
+  :root {
+    --felt: #123524;
+    --felt-dark: #0c261a;
+    --card-white: #fdfaf3;
+    --uno-red: #e6362a;
+    --uno-yellow: #f4c530;
+    --uno-yellow-dark: #c99e12;
+    --uno-green: #2ea043;
+    --uno-blue: #2472e0;
+    --uno-black: #1a1a1a;
+    --flex-purple: #7c3aed;
+    --flex-purple-dark: #5b21b6;
+    --gold: #f4c530;
+    --ink: #fdfaf3;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse 70% 42% at 50% 10%, rgba(230,54,42,0.4), transparent 62%),
+      radial-gradient(circle at 6% 88%, rgba(244,197,48,0.16), transparent 38%),
+      radial-gradient(circle at 94% 80%, rgba(36,114,224,0.18), transparent 38%),
+      radial-gradient(circle at 88% 12%, rgba(46,160,67,0.15), transparent 34%),
+      repeating-linear-gradient(45deg, rgba(255,255,255,0.035) 0 2px, transparent 2px 15px),
+      linear-gradient(180deg, #1d1d1d 0%, #070707 78%);
+    background-attachment: fixed;
+    font-family: 'Segoe UI', Verdana, sans-serif;
+    color: var(--ink);
+    display: flex;
+    justify-content: center;
+    padding: 24px 12px 60px;
+    overflow-x: hidden;
+  }
+
+  .app { width: 100%; max-width: 480px; }
+
+  h1 {
+    text-align: center;
+    font-family: 'Arial Black', 'Segoe UI', sans-serif;
+    font-weight: 900;
+    letter-spacing: 1px;
+    font-size: 1.5rem;
+    margin: 4px 0 22px;
+    text-shadow: 2px 2px 0 rgba(0,0,0,0.3);
+  }
+  h1 span.uno {
+    display: inline-block;
+    background: var(--card-white);
+    color: var(--uno-red);
+    padding: 2px 10px;
+    border-radius: 10px;
+    transform: rotate(-4deg);
+    box-shadow: 0 3px 0 rgba(0,0,0,0.25);
+    margin-right: 6px;
+  }
+
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  .btn {
+    border: none; border-radius: 999px; padding: 12px 20px;
+    font-size: 0.9rem; font-weight: 800; cursor: pointer; transition: transform 0.1s ease;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary { background: var(--card-white); color: var(--felt-dark); box-shadow: 0 3px 0 rgba(0,0,0,0.25); }
+  .btn-green   { background: var(--uno-green); color: var(--card-white); box-shadow: 0 3px 0 #1f7a30; }
+  .btn-blue    { background: var(--uno-blue); color: var(--card-white); box-shadow: 0 3px 0 #1a54ad; }
+  .btn-ghost   { background: transparent; color: var(--card-white); border: 2px solid rgba(253,250,243,0.4); }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+
+  /* ================= SETUP ================= */
+  .setup-card { background: rgba(253,250,243,0.07); border-radius: 18px; padding: 20px; }
+  .setup-card p.intro { margin: 0 0 18px; font-size: 0.88rem; opacity: 0.75; text-align: center; }
+  .setup-section-lbl {
+    font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 800;
+    opacity: 0.6; margin: 18px 0 10px 2px;
+  }
+  .setup-section-lbl.first { margin-top: 0; }
+
+  .count-stepper { display: flex; align-items: center; justify-content: center; gap: 18px; margin-bottom: 6px; }
+  .stepper-btn {
+    width: 42px; height: 42px; border-radius: 50%; border: none; background: var(--card-white);
+    color: var(--felt-dark); font-size: 1.3rem; font-weight: 900; cursor: pointer; box-shadow: 0 3px 0 rgba(0,0,0,0.25);
+  }
+  .stepper-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 rgba(0,0,0,0.25); }
+  .count-display { text-align: center; }
+  .count-display .num { font-size: 2rem; font-weight: 900; line-height: 1; }
+  .count-display .lbl { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1.2px; opacity: 0.6; }
+
+  .name-inputs { display: flex; flex-direction: column; gap: 10px; margin-bottom: 6px; }
+  .name-input-row {
+    display: flex; align-items: center; gap: 10px; background: var(--card-white);
+    border-radius: 10px; padding: 4px 6px 4px 14px;
+  }
+  .name-swatch { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; background: var(--uno-blue); }
+  .name-input-row input {
+    flex: 1; border: none; background: transparent; font-size: 0.95rem; font-weight: 700;
+    color: var(--felt-dark); padding: 10px 4px; outline: none; min-width: 0;
+  }
+
+  .maxscore-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--card-white); border-radius: 10px; padding: 10px 14px;
+  }
+  .maxscore-row label { color: var(--felt-dark); font-weight: 700; font-size: 0.9rem; }
+  .maxscore-row input[type="number"] {
+    width: 90px; border: none; background: rgba(18,53,36,0.08); border-radius: 8px;
+    font-size: 1rem; font-weight: 800; color: var(--felt-dark); text-align: center; padding: 8px 4px; outline: none;
+  }
+  .maxscore-hint { font-size: 0.72rem; opacity: 0.55; margin: 6px 2px 0; }
+
+  .setup-actions { display: flex; justify-content: center; margin-top: 22px; }
+
+  /* ================= DASHBOARD ================= */
+  .dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .dash-header h2 { margin: 0; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 800; opacity: 0.7; }
+  .dash-header .maxscore-pill { font-size: 0.72rem; opacity: 0.55; }
+  .dash-header-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .icon-btn {
+    background: rgba(253,250,243,0.1); border: none; color: var(--card-white); border-radius: 999px;
+    padding: 8px 12px; font-size: 0.75rem; font-weight: 700; cursor: pointer;
+  }
+  .icon-btn:active { transform: translateY(1px); }
+
+  .rule-hint { font-size: 0.72rem; opacity: 0.55; text-align: center; margin: 0 0 16px; }
+
+  .player-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 18px; }
+  .player-card {
+    background: var(--card-white); color: var(--felt-dark); border-radius: 16px; padding: 16px 18px;
+    display: flex; align-items: center; justify-content: space-between; box-shadow: 0 5px 0 rgba(0,0,0,0.22);
+    position: relative; overflow: hidden; will-change: transform;
+  }
+  .player-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: var(--pcolor, var(--uno-blue)); }
+  .player-card.leader::before { background: var(--gold); width: 8px; }
+  .player-info { padding-left: 10px; }
+  .player-name { font-weight: 800; font-size: 1rem; margin-bottom: 2px; display: flex; align-items: center; gap: 6px; }
+  .player-name .crown { font-size: 0.9rem; }
+  .player-score-row { display: flex; align-items: baseline; gap: 8px; }
+  .player-score { font-size: 1.9rem; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+  .player-score-lbl { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.5; font-weight: 700; }
+  .round-badge {
+    display: none; align-items: center; gap: 6px; margin-top: 4px; font-size: 0.75rem; font-weight: 800;
+    color: var(--flex-purple-dark);
+  }
+  .round-badge.visible { display: flex; }
+  .round-badge button {
+    border: none; background: rgba(124,58,237,0.12); color: var(--flex-purple-dark); border-radius: 999px;
+    width: 16px; height: 16px; font-size: 0.6rem; cursor: pointer; line-height: 1; padding: 0;
+  }
+  .player-add-btn {
+    background: var(--felt-dark); color: var(--card-white); border: none; border-radius: 999px;
+    padding: 12px 16px; font-size: 0.8rem; font-weight: 800; cursor: pointer; white-space: nowrap; box-shadow: 0 3px 0 rgba(0,0,0,0.3);
+  }
+  .player-add-btn:active { transform: translateY(1px); }
+  .player-add-btn.has-round { background: var(--flex-purple); }
+
+  .round-actions { display: flex; gap: 10px; }
+  .round-actions .btn { flex: 1; }
+  .newgame-row { display: flex; justify-content: center; margin-top: 14px; }
+
+  /* ================= API KEY SETTINGS ================= */
+  .settings-panel {
+    background: rgba(253,250,243,0.08); border-radius: 14px; padding: 14px 16px; margin-bottom: 16px; display: none;
+  }
+  .settings-panel.visible { display: block; }
+  .settings-panel h3 { margin: 0 0 6px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 800; opacity: 0.8; }
+  .settings-panel p { font-size: 0.78rem; opacity: 0.65; margin: 0 0 10px; line-height: 1.5; }
+  .settings-panel a { color: var(--card-white); }
+  .key-row { display: flex; gap: 8px; margin-bottom: 8px; }
+  .key-row input {
+    flex: 1; border: none; border-radius: 8px; padding: 10px 12px; font-size: 0.85rem;
+    background: var(--card-white); color: var(--felt-dark); outline: none; min-width: 0;
+  }
+  .key-row button {
+    border: none; border-radius: 8px; padding: 10px 14px; font-size: 0.8rem; font-weight: 800; cursor: pointer;
+    background: var(--uno-green); color: var(--card-white); white-space: nowrap;
+  }
+  .key-status { font-size: 0.78rem; opacity: 0.7; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .key-status .clear-link { background: none; border: none; color: var(--card-white); opacity: 0.6; text-decoration: underline; cursor: pointer; font-size: 0.75rem; }
+
+  /* ================= COUNTER ================= */
+  .counter-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .back-btn { background: rgba(253,250,243,0.1); border: none; color: var(--card-white); border-radius: 999px; width: 38px; height: 38px; font-size: 1.1rem; cursor: pointer; }
+  .counter-header .who { font-size: 0.95rem; font-weight: 800; opacity: 0.9; }
+
+  .scoreboard {
+    background: var(--card-white); color: var(--felt-dark); border-radius: 18px; padding: 18px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 6px 0 rgba(0,0,0,0.25), 0 10px 20px rgba(0,0,0,0.3); margin-bottom: 22px;
+  }
+  .scoreboard .label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.6; font-weight: 700; }
+  .scoreboard .total { font-size: 2.6rem; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+  .scoreboard .count { font-size: 0.85rem; opacity: 0.7; text-align: right; }
+  .reset-btn {
+    background: none; border: 2px solid var(--felt-dark); color: var(--felt-dark); border-radius: 999px;
+    padding: 8px 14px; font-size: 0.75rem; font-weight: 700; cursor: pointer; opacity: 0.7;
+  }
+  .reset-btn:hover { opacity: 1; }
+
+  .scan-block {
+    background: repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 10px, rgba(255,255,255,0.02) 10px 20px);
+    border: 2px dashed rgba(253,250,243,0.35); border-radius: 16px; padding: 18px; margin-bottom: 20px; text-align: center;
+  }
+  .scan-block-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .scan-block h3 { margin: 0; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 800; opacity: 0.75; }
+  .scan-hint { font-size: 0.78rem; opacity: 0.55; margin: 4px 0 14px; }
+  .scan-capture-btn {
+    background: var(--card-white); color: var(--felt-dark); border: none; border-radius: 999px; padding: 12px 22px;
+    font-size: 0.95rem; font-weight: 800; cursor: pointer; box-shadow: 0 3px 0 rgba(0,0,0,0.25);
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  #cameraInput { display: none; }
+  .scan-preview { margin-top: 14px; display: none; }
+  .scan-preview.visible { display: block; }
+  .scan-preview img { max-width: 100%; max-height: 220px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+  .scan-actions { margin-top: 12px; display: flex; gap: 10px; justify-content: center; }
+  .scan-status { margin-top: 12px; font-size: 0.82rem; opacity: 0.75; min-height: 18px; }
+  .spinner {
+    display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(253,250,243,0.3);
+    border-top-color: var(--card-white); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .review-block { background: rgba(253,250,243,0.08); border-radius: 14px; padding: 14px; margin-top: 14px; display: none; text-align: left; }
+  .review-block.visible { display: block; }
+  .review-block h3 { margin: 0 0 10px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1.2px; opacity: 0.7; }
+  .review-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .review-actions { display: flex; gap: 10px; }
+
+  .panel { border-radius: 16px; padding: 14px 14px 16px; margin-bottom: 14px; box-shadow: 0 4px 0 rgba(0,0,0,0.25); }
+  .panel h3 { margin: 0 0 10px 2px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 800; opacity: 0.85; }
+  .panel.numbers { background: var(--card-white); color: var(--felt-dark); }
+  .panel.actions {
+    background: linear-gradient(120deg, var(--uno-red), var(--uno-yellow) 33%, var(--uno-green) 66%, var(--uno-blue));
+    color: var(--card-white);
+  }
+  .panel.wild { background: var(--uno-black); }
+
+  .btn-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .btn-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .btn-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+
+  .card-btn {
+    position: relative;
+    aspect-ratio: 2 / 3;
+    border: none;
+    border-radius: 12%;
+    cursor: pointer;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.3), inset 0 0 0 2px rgba(255,255,255,0.25);
+    transition: transform 0.1s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 6% 4%;
+    overflow: hidden;
+  }
+  .card-btn:active { transform: translateY(1px) scale(0.97); }
+
+  .card-btn.card-color-0 { background: var(--uno-red); }
+  .card-btn.card-color-1 { background: var(--uno-yellow); }
+  .card-btn.card-color-2 { background: var(--uno-green); }
+  .card-btn.card-color-3 { background: var(--uno-blue); }
+  .card-btn.card-black   { background: var(--uno-black); }
+
+  .card-oval {
+    background: var(--card-white);
+    border-radius: 50%;
+    width: 78%;
+    aspect-ratio: 1 / 1.5;
+    transform: rotate(-12deg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 0 2px rgba(0,0,0,0.06) inset;
+    flex-shrink: 0;
+  }
+  .card-value {
+    transform: rotate(12deg);
+    font-weight: 900;
+    font-size: 1.15rem;
+    line-height: 1;
+  }
+  .card-color-0 .card-value { color: var(--uno-red); }
+  .card-color-1 .card-value { color: var(--uno-yellow-dark); }
+  .card-color-2 .card-value { color: var(--uno-green); }
+  .card-color-3 .card-value { color: var(--uno-blue); }
+  .card-black .card-value   { color: var(--uno-black); }
+
+  .card-sub {
+    margin-top: 5%;
+    font-size: 0.6rem;
+    font-weight: 800;
+    text-align: center;
+    line-height: 1.1;
+    color: var(--card-white);
+  }
+  .card-color-1 .card-sub { color: var(--felt-dark); }
+
+  .card-corner {
+    position: absolute;
+    top: 6%; left: 9%;
+    font-size: 0.6rem;
+    font-weight: 900;
+    color: var(--card-white);
+  }
+  .card-color-1 .card-corner { color: var(--felt-dark); }
+
+
+  .hand h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 800; opacity: 0.7; margin: 0 0 10px 2px; }
+  .hand-list { display: flex; flex-wrap: wrap; gap: 8px; min-height: 40px; }
+  .chip {
+    display: flex; align-items: center; gap: 6px; background: var(--card-white); color: var(--felt-dark);
+    border-radius: 999px; padding: 6px 10px 6px 12px; font-size: 0.8rem; font-weight: 700; box-shadow: 0 2px 0 rgba(0,0,0,0.2);
+  }
+  .chip .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; background: var(--uno-blue); }
+  .chip .dot.wild { background: var(--uno-black); }
+  .chip button { border: none; background: none; color: var(--felt-dark); opacity: 0.4; font-weight: 900; cursor: pointer; font-size: 0.9rem; padding: 0 2px; }
+  .chip button:hover { opacity: 1; }
+  .empty-hint { opacity: 0.5; font-size: 0.85rem; font-style: italic; padding: 8px 2px; }
+
+  .commit-bar { display: flex; gap: 10px; margin: 20px 0 4px; }
+  .commit-bar .btn { flex: 1; }
+
+  .rules-note { margin-top: 22px; font-size: 0.72rem; opacity: 0.55; text-align: center; line-height: 1.5; }
+
+  /* ================= ENDSCREEN ================= */
+  .celebrate-wrap { position: relative; text-align: center; padding: 30px 10px 10px; overflow: hidden; }
+  .confetti-piece {
+    position: absolute; top: -20px; font-size: 1.4rem; animation: confetti-fall linear forwards;
+  }
+  @keyframes confetti-fall {
+    0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(340px) rotate(320deg); opacity: 0; }
+  }
+  .trophy { font-size: 3.2rem; margin-bottom: 6px; }
+  .winner-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.7; font-weight: 800; }
+  .winner-name { font-size: 1.7rem; font-weight: 900; margin: 6px 0 4px; text-shadow: 2px 2px 0 rgba(0,0,0,0.3); }
+  .winner-sub { font-size: 0.85rem; opacity: 0.8; margin-bottom: 6px; }
+
+  .final-standings { background: rgba(253,250,243,0.08); border-radius: 16px; padding: 14px; margin: 18px 0; }
+  .final-standings h3 { margin: 0 0 10px 2px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1.2px; opacity: 0.7; }
+  .final-row {
+    display: flex; align-items: center; justify-content: space-between; background: var(--card-white); color: var(--felt-dark);
+    border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; font-weight: 700; font-size: 0.9rem;
+  }
+  .final-row .medal { margin-right: 8px; }
+  .end-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1><span class="uno">UNO</span>Flex Punktezähler</h1>
+
+  <!-- ================= SETUP ================= -->
+  <div class="screen active" id="screen-setup">
+    <div class="setup-card">
+      <p class="intro">Wie viele Spieler:innen sind dabei? Namen und Höchstpunktzahl kannst du jederzeit anpassen.</p>
+
+      <div class="setup-section-lbl first">Spieleranzahl</div>
+      <div class="count-stepper">
+        <button class="stepper-btn" id="countMinus">–</button>
+        <div class="count-display">
+          <div class="num" id="countNum">2</div>
+          <div class="lbl">Spieler</div>
+        </div>
+        <button class="stepper-btn" id="countPlus">+</button>
+      </div>
+
+      <div class="setup-section-lbl">Namen</div>
+      <div class="name-inputs" id="nameInputs"></div>
+
+      <div class="setup-section-lbl">Höchstpunktzahl</div>
+      <div class="maxscore-row">
+        <label for="maxScoreInput">Spiel endet bei</label>
+        <input type="number" id="maxScoreInput" value="500" min="10" step="10">
+      </div>
+      <p class="maxscore-hint">Wer die wenigsten Punkte hat, spielt am besten. Erreicht jemand diese Punktzahl, endet das Spiel und der Bestplatzierte wird gefeiert.</p>
+
+      <div class="setup-actions">
+        <button class="btn btn-green" id="startBtn">Los geht's!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= DASHBOARD ================= -->
+  <div class="screen" id="screen-dashboard">
+    <div class="settings-panel" id="settingsPanel">
+      <h3>Google Gemini API-Key (kostenlos)</h3>
+      <p>
+        Für die Foto-Erkennung brauchst du einen kostenlosen API-Key von
+        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>
+        (Google-Konto genügt, keine Kreditkarte nötig). Der Gratis-Tarif hat ein Anfragen-Limit pro Minute/Tag –
+        für eine Spielrunde reicht das. Der Key wird nur lokal in diesem Browser gespeichert. Datei mit gespeichertem
+        Key nicht an andere weitergeben.
+      </p>
+      <div class="key-row">
+        <input type="password" id="apiKeyInput" placeholder="AIza...">
+        <button id="saveKeyBtn">Speichern</button>
+      </div>
+      <div class="key-status">
+        <span id="keyStatusText">Kein API-Key hinterlegt.</span>
+        <button class="clear-link" id="clearKeyBtn">Key entfernen</button>
+      </div>
+
+      <h3 style="margin-top:18px;">Referenzfoto des Kartendecks (optional)</h3>
+      <p>
+        Fotografiere einmalig alle unterschiedlichen Kartentypen deines UNO-Flex-Decks nebeneinander. Wird bei jeder
+        Erkennung mitgeschickt, damit die KI die genauen Kartendesigns als Vorlage kennt.
+      </p>
+      <label class="scan-capture-btn" for="refPhotoInput" style="display:inline-flex;">🃏 Referenzfoto aufnehmen</label>
+      <input type="file" id="refPhotoInput" accept="image/*" capture="environment" style="display:none;">
+      <div id="refPreviewWrap" style="margin-top:10px; display:none;">
+        <img id="refPreviewImg" style="max-width:100%; max-height:160px; border-radius:8px;" alt="Referenzfoto Vorschau">
+      </div>
+      <div class="key-status" style="margin-top:10px;">
+        <span id="refStatusText">Kein Referenzfoto hinterlegt.</span>
+        <button class="clear-link" id="clearRefBtn">Referenzfoto entfernen</button>
+      </div>
+    </div>
+
+    <div class="dash-header">
+      <div>
+        <h2>Punktestand</h2>
+        <div class="maxscore-pill" id="maxScorePill"></div>
+      </div>
+      <div class="dash-header-actions">
+        <button class="icon-btn" id="toggleSettingsBtn">⚙️ API-Key</button>
+        <button class="icon-btn" id="editPlayersBtn">Spieler / Limit</button>
+      </div>
+    </div>
+    <p class="rule-hint">Wenigste Punkte = beste Platzierung 👑</p>
+
+    <div class="player-list" id="playerList"></div>
+
+    <div class="round-actions">
+      <button class="btn btn-green" id="endRoundBtn">Runde beenden</button>
+    </div>
+    <div class="newgame-row">
+      <button class="btn btn-ghost" id="newGameBtn">Neues Spiel (alle Punkte zurücksetzen)</button>
+    </div>
+  </div>
+
+  <!-- ================= COUNTER ================= -->
+  <div class="screen" id="screen-counter">
+    <div class="counter-header">
+      <button class="back-btn" id="backBtn">←</button>
+      <div class="who">Punkte für <span id="counterPlayerName">–</span> zählen</div>
+    </div>
+
+    <div class="scoreboard">
+      <div>
+        <div class="label">Rundenwert</div>
+        <div class="total" id="total">0</div>
+      </div>
+      <div>
+        <div class="count" id="count">0 Karten</div>
+        <button class="reset-btn" id="resetBtn">Hand leeren</button>
+      </div>
+    </div>
+
+    <div class="hand">
+      <h3>Aktuelle Hand</h3>
+      <div class="hand-list" id="handList"></div>
+    </div>
+
+    <div class="panel numbers">
+      <h3>Zahlenkarten</h3>
+      <div class="btn-grid" id="numberGrid"></div>
+    </div>
+
+    <div class="panel actions">
+      <h3>Aktionskarten</h3>
+      <div class="btn-grid cols-3" id="actionGrid"></div>
+    </div>
+
+    <div class="panel wild">
+      <h3>Farbwahl (Schwarz)</h3>
+      <div class="btn-grid cols-2" id="wildGrid"></div>
+    </div>
+
+    <div class="scan-block">
+      <div class="scan-block-header">
+        <h3>Foto-Erkennung</h3>
+      </div>
+      <p class="scan-hint" id="scanHintText">Fotografiere die Handkarten – die Erkennung übernimmt den Rest.</p>
+      <label class="scan-capture-btn" for="cameraInput" id="captureLabel">📷 Foto aufnehmen</label>
+      <input type="file" id="cameraInput" accept="image/*" capture="environment">
+      <div class="scan-preview" id="scanPreview">
+        <img id="previewImg" alt="Vorschau des aufgenommenen Fotos">
+        <div class="scan-actions">
+          <button class="btn btn-green" id="analyzeBtn">Karten erkennen</button>
+          <button class="btn btn-ghost" id="discardBtn">Verwerfen</button>
+        </div>
+        <div class="scan-status" id="scanStatus"></div>
+      </div>
+      <div class="review-block" id="reviewBlock">
+        <h3>Erkannte Karten – bitte prüfen</h3>
+        <div class="review-list" id="reviewList"></div>
+        <div class="review-actions">
+          <button class="btn btn-blue" id="confirmBtn">Zur Hand hinzufügen</button>
+          <button class="btn btn-ghost" id="rejectBtn">Verwerfen</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="commit-bar">
+      <button class="btn btn-blue" id="commitBtn">Übernehmen (für diese Runde vormerken)</button>
+      <button class="btn btn-ghost" id="cancelBtn">Abbrechen</button>
+    </div>
+
+    <div class="rules-note">
+      Zahlen 0–9 = aufgedruckter Wert · Aussetzen / Richtungswechsel / +2 = 20 Punkte ·
+      Farbwahl / Farbwahl +4 = 50 Punkte · Flexkarte / Kombi-Power = 20 Punkte ·
+      Power „Zieh 4 + Farbwahl" = 50 Punkte<br>
+      Übernommene Punkte werden erst zur Gesamtpunktzahl addiert, wenn auf der Punktestand-Seite
+      „Runde beenden" gedrückt wird.
+    </div>
+  </div>
+
+  <!-- ================= ENDSCREEN ================= -->
+  <div class="screen" id="screen-end">
+    <div class="celebrate-wrap" id="confettiWrap">
+      <div class="trophy">🏆</div>
+      <div class="winner-title">Spiel beendet</div>
+      <div class="winner-name" id="endWinnerName">–</div>
+      <div class="winner-sub" id="endWinnerSub"></div>
+    </div>
+
+    <div class="final-standings">
+      <h3>Endstand</h3>
+      <div id="finalStandingsList"></div>
+    </div>
+
+    <div class="end-actions">
+      <button class="btn btn-green" id="endNewGameBtn">Neues Spiel starten</button>
+      <button class="btn btn-ghost" id="endBackBtn">Zurück zum Punktestand</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const PLAYER_COLORS = ['#e6362a', '#c99e12', '#2ea043', '#2472e0', '#7c3aed', '#e6362a', '#c99e12', '#2ea043', '#2472e0', '#7c3aed'];
+  const API_KEY_STORAGE_KEY = 'unoflex_gemini_api_key';
+  const REF_PHOTO_STORAGE_KEY = 'unoflex_reference_photo';
+
+  const numberCards = ['0','1','2','3','4','5','6','7','8','9'];
+  const actionCards = [
+    { name: 'Aussetzen', value: 20 },
+    { name: 'Richtungsw.', value: 20 },
+    { name: '+2', value: 20 }
+  ];
+  const wildCards = [
+    { name: 'Farbwahl', value: 50 },
+    { name: 'Farbwahl +4', value: 50 }
+  ];
+  const flexCards = [
+    { name: 'Flexkarte', value: 20 },
+    { name: 'Power: Zieh 4 + Farbwahl', value: 50, wild: true },
+    { name: 'Power: Kombi-Aktion', value: 20 }
+  ];
+
+  let players = []; // { id, name, score, roundPoints }
+  let pid = 0;
+  let currentPlayerId = null;
+  let maxScore = 500;
+
+  let hand = [];
+  let uid = 0;
+  let pendingReview = [];
+  let currentPhoto = null;
+
+  // ================= API KEY SETTINGS =================
+  const settingsPanel = document.getElementById('settingsPanel');
+  const apiKeyInput = document.getElementById('apiKeyInput');
+  const keyStatusText = document.getElementById('keyStatusText');
+  const captureLabel = document.getElementById('captureLabel');
+  const scanHintText = document.getElementById('scanHintText');
+
+  function getApiKey() {
+    try { return localStorage.getItem(API_KEY_STORAGE_KEY) || ''; }
+    catch (e) { return ''; }
+  }
+
+  function refreshKeyStatus() {
+    const key = getApiKey();
+    if (key) {
+      keyStatusText.textContent = `API-Key hinterlegt (endet auf …${key.slice(-4)}).`;
+      scanHintText.textContent = 'Fotografiere die Handkarten – die Erkennung übernimmt den Rest.';
+    } else {
+      keyStatusText.textContent = 'Kein API-Key hinterlegt.';
+      scanHintText.textContent = 'Foto-Erkennung benötigt einen API-Key (⚙️ auf der Punktestand-Seite).';
+    }
+  }
+
+  document.getElementById('toggleSettingsBtn').addEventListener('click', () => {
+    settingsPanel.classList.toggle('visible');
+  });
+
+  document.getElementById('saveKeyBtn').addEventListener('click', () => {
+    const val = apiKeyInput.value.trim();
+    if (!val) return;
+    try { localStorage.setItem(API_KEY_STORAGE_KEY, val); } catch (e) {}
+    apiKeyInput.value = '';
+    refreshKeyStatus();
+  });
+
+  document.getElementById('clearKeyBtn').addEventListener('click', () => {
+    try { localStorage.removeItem(API_KEY_STORAGE_KEY); } catch (e) {}
+    refreshKeyStatus();
+  });
+
+  refreshKeyStatus();
+
+  // ================= REFERENZFOTO =================
+  const refPhotoInput = document.getElementById('refPhotoInput');
+  const refPreviewWrap = document.getElementById('refPreviewWrap');
+  const refPreviewImg = document.getElementById('refPreviewImg');
+  const refStatusText = document.getElementById('refStatusText');
+
+  function getReferencePhoto() {
+    try {
+      const raw = localStorage.getItem(REF_PHOTO_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  function refreshRefStatus() {
+    const ref = getReferencePhoto();
+    if (ref) {
+      refStatusText.textContent = 'Referenzfoto hinterlegt ✓';
+      refPreviewImg.src = `data:${ref.mediaType};base64,${ref.base64}`;
+      refPreviewWrap.style.display = 'block';
+    } else {
+      refStatusText.textContent = 'Kein Referenzfoto hinterlegt.';
+      refPreviewWrap.style.display = 'none';
+    }
+  }
+
+  refPhotoInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImageToBase64(file, 1600, 0.85);
+      try { localStorage.setItem(REF_PHOTO_STORAGE_KEY, JSON.stringify(compressed)); } catch (err) {}
+      refreshRefStatus();
+    } catch (err) {
+      refStatusText.textContent = 'Referenzfoto konnte nicht gespeichert werden.';
+    }
+    refPhotoInput.value = '';
+  });
+
+  document.getElementById('clearRefBtn').addEventListener('click', () => {
+    try { localStorage.removeItem(REF_PHOTO_STORAGE_KEY); } catch (e) {}
+    refreshRefStatus();
+  });
+
+  refreshRefStatus();
+
+  // ================= SETUP SCREEN =================
+  const countNum = document.getElementById('countNum');
+  const nameInputsEl = document.getElementById('nameInputs');
+  const maxScoreInput = document.getElementById('maxScoreInput');
+  let setupCount = 2;
+  let setupNames = ['Spieler 1', 'Spieler 2'];
+
+  function renderNameInputs() {
+    nameInputsEl.innerHTML = '';
+    for (let i = 0; i < setupCount; i++) {
+      const row = document.createElement('div');
+      row.className = 'name-input-row';
+      const swatch = document.createElement('span');
+      swatch.className = 'name-swatch';
+      swatch.style.background = PLAYER_COLORS[i % PLAYER_COLORS.length];
+      row.appendChild(swatch);
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = setupNames[i] || `Spieler ${i + 1}`;
+      input.placeholder = `Spieler ${i + 1}`;
+      input.maxLength = 20;
+      input.addEventListener('input', () => { setupNames[i] = input.value; });
+      row.appendChild(input);
+      nameInputsEl.appendChild(row);
+    }
+  }
+
+  document.getElementById('countMinus').addEventListener('click', () => {
+    if (setupCount > 2) { setupCount--; renderNameInputs(); countNum.textContent = setupCount; }
+  });
+  document.getElementById('countPlus').addEventListener('click', () => {
+    if (setupCount < 10) { setupCount++; renderNameInputs(); countNum.textContent = setupCount; }
+  });
+
+  document.getElementById('startBtn').addEventListener('click', () => {
+    const existingByName = {};
+    players.forEach(p => { existingByName[p.name] = p; });
+
+    const newPlayers = [];
+    for (let i = 0; i < setupCount; i++) {
+      const name = (setupNames[i] || `Spieler ${i + 1}`).trim() || `Spieler ${i + 1}`;
+      const prev = existingByName[name];
+      newPlayers.push({ id: prev ? prev.id : pid++, name, score: prev ? prev.score : 0, roundPoints: 0 });
+    }
+    players = newPlayers;
+
+    const parsedMax = parseInt(maxScoreInput.value, 10);
+    maxScore = Number.isFinite(parsedMax) && parsedMax > 0 ? parsedMax : 500;
+
+    showScreen('dashboard');
+    renderDashboard();
+  });
+
+  renderNameInputs();
+
+  // ================= DASHBOARD =================
+  const playerListEl = document.getElementById('playerList');
+  const maxScorePill = document.getElementById('maxScorePill');
+
+  function renderDashboard() {
+    maxScorePill.textContent = `Spielende bei ${maxScore} Punkten (wenigste Punkte gewinnt)`;
+
+    const scores = players.map(p => p.score);
+    const minScore = Math.min(...scores);
+    const maxScoreVal = Math.max(...scores);
+    const showLeader = players.length > 0 && minScore !== maxScoreVal;
+
+    const sorted = [...players].sort((a, b) => a.score - b.score);
+
+    playerListEl.innerHTML = '';
+    sorted.forEach(p => {
+      const card = document.createElement('div');
+      card.className = 'player-card';
+      card.dataset.playerId = p.id;
+      const isLeader = showLeader && p.score === minScore;
+      if (isLeader) card.classList.add('leader');
+      card.style.setProperty('--pcolor', PLAYER_COLORS[players.indexOf(p) % PLAYER_COLORS.length]);
+
+      const info = document.createElement('div');
+      info.className = 'player-info';
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'player-name';
+      nameEl.innerHTML = (isLeader ? '<span class="crown">👑</span>' : '') + p.name;
+
+      const scoreLbl = document.createElement('div');
+      scoreLbl.className = 'player-score-lbl';
+      scoreLbl.textContent = 'Punkte gesamt';
+
+      const scoreRow = document.createElement('div');
+      scoreRow.className = 'player-score-row';
+      const scoreEl = document.createElement('div');
+      scoreEl.className = 'player-score';
+      scoreEl.textContent = p.score;
+      scoreRow.appendChild(scoreEl);
+
+      const roundBadge = document.createElement('div');
+      roundBadge.className = 'round-badge' + (p.roundPoints ? ' visible' : '');
+      roundBadge.innerHTML = `<span>+${p.roundPoints} diese Runde</span>`;
+      const clearRoundBtn = document.createElement('button');
+      clearRoundBtn.textContent = '✕';
+      clearRoundBtn.title = 'Rundenpunkte zurücksetzen';
+      clearRoundBtn.addEventListener('click', () => { p.roundPoints = 0; renderDashboard(); });
+      roundBadge.appendChild(clearRoundBtn);
+
+      info.appendChild(nameEl);
+      info.appendChild(scoreLbl);
+      info.appendChild(scoreRow);
+      info.appendChild(roundBadge);
+
+      const addBtn = document.createElement('button');
+      addBtn.className = 'player-add-btn' + (p.roundPoints ? ' has-round' : '');
+      addBtn.textContent = p.roundPoints ? `+ Punkte (${p.roundPoints})` : '+ Punkte';
+      addBtn.addEventListener('click', () => openCounterFor(p.id));
+
+      card.appendChild(info);
+      card.appendChild(addBtn);
+      playerListEl.appendChild(card);
+    });
+  }
+
+  document.getElementById('editPlayersBtn').addEventListener('click', () => {
+    setupCount = players.length;
+    setupNames = players.map(p => p.name);
+    maxScoreInput.value = maxScore;
+    countNum.textContent = setupCount;
+    renderNameInputs();
+    showScreen('setup');
+  });
+
+  document.getElementById('newGameBtn').addEventListener('click', () => {
+    players.forEach(p => { p.score = 0; p.roundPoints = 0; });
+    renderDashboard();
+  });
+
+  // ---- Runde beenden: Punkte addieren + FLIP-Sortier-Animation + Count-up ----
+  document.getElementById('endRoundBtn').addEventListener('click', () => {
+    const beforeRects = {};
+    document.querySelectorAll('.player-card').forEach(el => {
+      beforeRects[el.dataset.playerId] = el.getBoundingClientRect();
+    });
+
+    const oldScores = {};
+    players.forEach(p => {
+      oldScores[p.id] = p.score;
+      p.score += p.roundPoints;
+      p.roundPoints = 0;
+    });
+
+    renderDashboard();
+
+    requestAnimationFrame(() => {
+      document.querySelectorAll('.player-card').forEach(el => {
+        const id = el.dataset.playerId;
+        const oldRect = beforeRects[id];
+        if (!oldRect) return;
+        const newRect = el.getBoundingClientRect();
+        const deltaY = oldRect.top - newRect.top;
+        if (deltaY !== 0) {
+          el.style.transition = 'none';
+          el.style.transform = `translateY(${deltaY}px)`;
+          requestAnimationFrame(() => {
+            el.style.transition = 'transform 0.5s cubic-bezier(.2,.8,.2,1)';
+            el.style.transform = '';
+          });
+        }
+      });
+    });
+
+    players.forEach(p => {
+      const scoreEl = document.querySelector(`.player-card[data-player-id="${p.id}"] .player-score`);
+      if (scoreEl) animateCount(scoreEl, oldScores[p.id], p.score, 650);
+    });
+
+    setTimeout(() => { checkGameEnd(); }, 750);
+  });
+
+  function animateCount(el, from, to, duration) {
+    if (from === to) { el.textContent = to; return; }
+    const start = performance.now();
+    function step(now) {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      el.textContent = Math.round(from + (to - from) * eased);
+      if (t < 1) requestAnimationFrame(step);
+      else el.textContent = to;
+    }
+    requestAnimationFrame(step);
+  }
+
+  // ---- Endscreen ----
+  function checkGameEnd() {
+    const anyCapped = players.some(p => p.score >= maxScore);
+    if (!anyCapped) return;
+
+    const minScore = Math.min(...players.map(p => p.score));
+    const winners = players.filter(p => p.score === minScore);
+    showEndScreen(winners, minScore);
+  }
+
+  function showEndScreen(winners, minScore) {
+    document.getElementById('endWinnerName').textContent = winners.map(w => w.name).join(' & ');
+    document.getElementById('endWinnerSub').textContent =
+      `Mit nur ${minScore} Punkten die beste Platzierung – Glückwunsch!`;
+
+    const sorted = [...players].sort((a, b) => a.score - b.score);
+    const medals = ['🥇', '🥈', '🥉'];
+    const listEl = document.getElementById('finalStandingsList');
+    listEl.innerHTML = '';
+    sorted.forEach((p, i) => {
+      const row = document.createElement('div');
+      row.className = 'final-row';
+      row.innerHTML = `<span><span class="medal">${medals[i] || `${i + 1}.`}</span>${p.name}</span><span>${p.score}</span>`;
+      listEl.appendChild(row);
+    });
+
+    spawnConfetti();
+    showScreen('end');
+  }
+
+  function spawnConfetti() {
+    const wrap = document.getElementById('confettiWrap');
+    wrap.querySelectorAll('.confetti-piece').forEach(el => el.remove());
+    const emojis = ['🎉', '🎊', '⭐', '🥳', '🏆'];
+    for (let i = 0; i < 18; i++) {
+      const span = document.createElement('span');
+      span.className = 'confetti-piece';
+      span.textContent = emojis[i % emojis.length];
+      span.style.left = `${Math.random() * 100}%`;
+      span.style.animationDuration = `${1.4 + Math.random() * 1.2}s`;
+      span.style.animationDelay = `${Math.random() * 0.6}s`;
+      wrap.appendChild(span);
+    }
+  }
+
+  document.getElementById('endNewGameBtn').addEventListener('click', () => {
+    players.forEach(p => { p.score = 0; p.roundPoints = 0; });
+    showScreen('dashboard');
+    renderDashboard();
+  });
+
+  document.getElementById('endBackBtn').addEventListener('click', () => {
+    showScreen('dashboard');
+    renderDashboard();
+  });
+
+  // ================= SCREEN SWITCHING =================
+  function showScreen(name) {
+    ['setup', 'dashboard', 'counter', 'end'].forEach(s => {
+      document.getElementById(`screen-${s}`).classList.toggle('active', s === name);
+    });
+  }
+
+  function openCounterFor(playerId) {
+    currentPlayerId = playerId;
+    const p = players.find(x => x.id === playerId);
+    document.getElementById('counterPlayerName').textContent = p ? p.name : '–';
+    hand = [];
+    resetScanUI();
+    refreshKeyStatus();
+    renderHand();
+    showScreen('counter');
+  }
+
+  document.getElementById('backBtn').addEventListener('click', () => { showScreen('dashboard'); renderDashboard(); });
+  document.getElementById('cancelBtn').addEventListener('click', () => { showScreen('dashboard'); renderDashboard(); });
+
+  document.getElementById('commitBtn').addEventListener('click', () => {
+    const total = hand.reduce((sum, c) => sum + c.value, 0);
+    const p = players.find(x => x.id === currentPlayerId);
+    if (p) p.roundPoints += total;
+    showScreen('dashboard');
+    renderDashboard();
+  });
+
+  // ================= COUNTER: manual card grids =================
+  let cardColorCounter = 0;
+  function makeCardButton(mainLabel, subLabel, cornerLabel, forceBlack, onClick) {
+    const btn = document.createElement('button');
+    btn.className = 'card-btn ' + (forceBlack ? 'card-black' : `card-color-${cardColorCounter++ % 4}`);
+
+    if (cornerLabel) {
+      const corner = document.createElement('span');
+      corner.className = 'card-corner';
+      corner.textContent = cornerLabel;
+      btn.appendChild(corner);
+    }
+
+    const oval = document.createElement('span');
+    oval.className = 'card-oval';
+    const val = document.createElement('span');
+    val.className = 'card-value';
+    val.textContent = mainLabel;
+    oval.appendChild(val);
+    btn.appendChild(oval);
+
+    if (subLabel) {
+      const sub = document.createElement('span');
+      sub.className = 'card-sub';
+      sub.textContent = subLabel;
+      btn.appendChild(sub);
+    }
+
+    btn.addEventListener('click', onClick);
+    return btn;
+  }
+
+  function buildManualGrids() {
+    const numberGrid = document.getElementById('numberGrid');
+    numberCards.forEach(n => {
+      const btn = makeCardButton(n, null, n, false, () => addCard(n, parseInt(n, 10), false));
+      numberGrid.appendChild(btn);
+    });
+
+    const actionIcons = { 'Aussetzen': '🚫', 'Richtungsw.': '↺', '+2': '+2' };
+    const actionGrid = document.getElementById('actionGrid');
+    actionCards.forEach(a => {
+      const btn = makeCardButton(actionIcons[a.name] || a.name, a.name, null, false, () => addCard(a.name, a.value, false));
+      actionGrid.appendChild(btn);
+    });
+
+    const wildIcons = { 'Farbwahl': '🎨', 'Farbwahl +4': '+4' };
+    const wildGrid = document.getElementById('wildGrid');
+    wildCards.forEach(w => {
+      const btn = makeCardButton(wildIcons[w.name] || w.name, `${w.name} · ${w.value}`, null, true, () => addCard(w.name, w.value, true));
+      wildGrid.appendChild(btn);
+    });
+  }
+
+  function addCard(name, value, isWild) {
+    hand.push({ id: uid++, name, value, wild: isWild });
+    renderHand();
+  }
+
+  function removeCard(id) {
+    hand = hand.filter(c => c.id !== id);
+    renderHand();
+  }
+
+  function renderHand() {
+    const total = hand.reduce((sum, c) => sum + c.value, 0);
+    document.getElementById('total').textContent = total;
+    document.getElementById('count').textContent = hand.length === 1 ? '1 Karte' : `${hand.length} Karten`;
+
+    const list = document.getElementById('handList');
+    list.innerHTML = '';
+
+    if (hand.length === 0) {
+      const hint = document.createElement('div');
+      hint.className = 'empty-hint';
+      hint.textContent = 'Noch keine Karten hinzugefügt — tippe oben auf die Handkarten oder nutze die Foto-Erkennung.';
+      list.appendChild(hint);
+      return;
+    }
+
+    hand.forEach(c => list.appendChild(buildChip(c.name, c.value, c.wild, () => removeCard(c.id))));
+  }
+
+  function buildChip(name, value, isWild, onRemove) {
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    const dot = document.createElement('span');
+    dot.className = 'dot' + (isWild ? ' wild' : '');
+    chip.appendChild(dot);
+    const label = document.createElement('span');
+    label.textContent = `${name} · ${value}`;
+    chip.appendChild(label);
+    const removeBtn = document.createElement('button');
+    removeBtn.textContent = '✕';
+    removeBtn.addEventListener('click', onRemove);
+    chip.appendChild(removeBtn);
+    return chip;
+  }
+
+  document.getElementById('resetBtn').addEventListener('click', () => { hand = []; renderHand(); });
+
+  buildManualGrids();
+
+  // ================= COUNTER: Foto-Erkennung (Gemini) =================
+  const cameraInput = document.getElementById('cameraInput');
+  const scanPreview = document.getElementById('scanPreview');
+  const previewImg = document.getElementById('previewImg');
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  const discardBtn = document.getElementById('discardBtn');
+  const scanStatus = document.getElementById('scanStatus');
+  const reviewBlock = document.getElementById('reviewBlock');
+  const reviewList = document.getElementById('reviewList');
+  const confirmBtn = document.getElementById('confirmBtn');
+  const rejectBtn = document.getElementById('rejectBtn');
+
+  cameraInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!getApiKey()) {
+      scanStatus.textContent = 'Kein API-Key hinterlegt. Bitte zuerst unter "⚙️ API-Key" auf der Punktestand-Seite einrichten.';
+      cameraInput.value = '';
+      return;
+    }
+
+    resetReview();
+    try {
+      currentPhoto = await compressImageToBase64(file, 1280, 0.82);
+      previewImg.src = `data:${currentPhoto.mediaType};base64,${currentPhoto.base64}`;
+      scanPreview.classList.add('visible');
+      scanStatus.textContent = '';
+      analyzeBtn.disabled = false;
+    } catch (err) {
+      scanStatus.textContent = 'Foto konnte nicht gelesen werden. Bitte erneut versuchen.';
+    }
+  });
+
+  discardBtn.addEventListener('click', () => {
+    currentPhoto = null;
+    cameraInput.value = '';
+    scanPreview.classList.remove('visible');
+    scanStatus.textContent = '';
+  });
+
+  analyzeBtn.addEventListener('click', async () => {
+    if (!currentPhoto) return;
+    const key = getApiKey();
+    if (!key) {
+      scanStatus.textContent = 'Kein API-Key hinterlegt. Bitte zuerst unter "⚙️ API-Key" einrichten.';
+      return;
+    }
+    analyzeBtn.disabled = true;
+    scanStatus.innerHTML = '<span class="spinner"></span>Karten werden erkannt …';
+    try {
+      const cards = await recognizeCards(currentPhoto, key);
+      if (!cards.length) {
+        scanStatus.textContent = 'Es konnten keine Karten sicher erkannt werden. Bitte ein schärferes Foto mit besserem Licht versuchen.';
+        analyzeBtn.disabled = false;
+        return;
+      }
+      pendingReview = cards.map(c => ({ id: uid++, name: c.label, value: c.value, wild: !!c.wild }));
+      scanStatus.textContent = `${cards.length} Karte(n) erkannt.`;
+      renderReview();
+    } catch (err) {
+      console.error(err);
+      scanStatus.textContent = `Erkennung fehlgeschlagen: ${err.message}. Bitte API-Key prüfen oder erneut versuchen.`;
+      analyzeBtn.disabled = false;
+    }
+  });
+
+  confirmBtn.addEventListener('click', () => {
+    pendingReview.forEach(c => hand.push({ id: c.id, name: c.name, value: c.value, wild: c.wild }));
+    pendingReview = [];
+    renderHand();
+    resetScanUI();
+  });
+
+  rejectBtn.addEventListener('click', () => { pendingReview = []; resetScanUI(); });
+
+  function resetReview() {
+    pendingReview = [];
+    reviewBlock.classList.remove('visible');
+    reviewList.innerHTML = '';
+  }
+
+  function resetScanUI() {
+    resetReview();
+    currentPhoto = null;
+    cameraInput.value = '';
+    scanPreview.classList.remove('visible');
+    scanStatus.textContent = '';
+    analyzeBtn.disabled = false;
+  }
+
+  function renderReview() {
+    reviewList.innerHTML = '';
+    reviewBlock.classList.add('visible');
+    pendingReview.forEach(c => {
+      const chip = buildChip(c.name, c.value, c.wild, () => {
+        pendingReview = pendingReview.filter(x => x.id !== c.id);
+        renderReview();
+      });
+      reviewList.appendChild(chip);
+    });
+    if (pendingReview.length === 0) reviewBlock.classList.remove('visible');
+  }
+
+  function compressImageToBase64(file, maxDim, quality) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Datei konnte nicht gelesen werden'));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('Bild konnte nicht geladen werden'));
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > height && width > maxDim) { height = Math.round(height * (maxDim / width)); width = maxDim; }
+          else if (height > maxDim) { width = Math.round(width * (maxDim / height)); height = maxDim; }
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve({ base64: dataUrl.split(',')[1], mediaType: 'image/jpeg' });
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function recognizeCards(photo, apiKey) {
+    const reference = getReferencePhoto();
+
+    let prompt = `Du bekommst `;
+    prompt += reference
+      ? `zwei Fotos: (1) ein Referenzfoto, das alle unterschiedlichen Kartentypen eines UNO-FLEX-Kartendecks nebeneinander zeigt (nutze es als Vorlage für die genauen Kartendesigns), und (2) ein Foto von aufgefächerten Handkarten desselben Decks, die du auswerten sollst.`
+      : `ein Foto von aufgefächerten Handkarten des Kartenspiels UNO FLEX (Sonderedition mit Flexkarten und Powerkarten zusätzlich zu klassischen UNO-Karten).`;
+
+    prompt += `
+Identifiziere jede einzelne, eindeutig erkennbare Karte auf dem Handkarten-Foto${reference ? ' (nicht auf dem Referenzfoto)' : ''}.
+
+Antworte AUSSCHLIESSLICH mit einem validen JSON-Array, ohne Markdown-Codeblöcke, ohne Erklärtext davor oder danach.
+Jedes Element hat exakt diese Felder:
+{"label": "<Kartenname, z.B. '7', 'Aussetzen', 'Richtungswechsel', '+2', 'Farbwahl', 'Farbwahl +4', 'Flexkarte', 'Power: Zieh 4 + Farbwahl', 'Power: Kombi-Aktion'>", "value": <Punktwert>, "wild": <true/false, ob es eine schwarze Farbwahl-/Wild-Karte ist>}
+
+Punktwerte nach UNO-Flex-Regeln:
+- Zahlenkarten 0-9: Wert = die Zahl selbst, wild=false
+- Aussetzen, Richtungswechsel, +2: Wert = 20, wild=false
+- Farbwahl, Farbwahl +4 (schwarze Karten): Wert = 50, wild=true
+- Flexkarte (farbige Doppel-Effekt-Karte): Wert = 20, wild=false
+- Power-Karte mit Farbwahl/Zieh 4 (schwarz): Wert = 50, wild=true
+- Power-Karte mit kombinierter Aktion ohne Farbwahl: Wert = 20, wild=false
+
+Wenn eine Karte nicht eindeutig lesbar ist (unscharf, verdeckt, abgeschnitten), lasse sie lieber weg statt zu raten.
+Wenn gar keine Karte erkennbar ist, antworte mit [].`;
+
+    const parts = [];
+    if (reference) {
+      parts.push({ inline_data: { mime_type: reference.mediaType, data: reference.base64 } });
+    }
+    parts.push({ inline_data: { mime_type: photo.mediaType, data: photo.base64 } });
+    parts.push({ text: prompt });
+
+    const model = 'gemini-2.5-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: [{ parts }] })
+    });
+
+    if (!response.ok) {
+      let detail = '';
+      try { const errBody = await response.json(); detail = errBody?.error?.message || ''; } catch (e) {}
+      if (response.status === 429) {
+        throw new Error('Kostenloses Anfragen-Limit erreicht – kurz warten und erneut versuchen');
+      }
+      throw new Error(`API-Fehler ${response.status}${detail ? ': ' + detail : ''}`);
+    }
+
+    const data = await response.json();
+    const text = (data.candidates?.[0]?.content?.parts || [])
+      .map(p => p.text || '')
+      .join('\n');
+    const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+    let parsed;
+    try { parsed = JSON.parse(cleaned); }
+    catch (e) { throw new Error('Antwort konnte nicht als JSON gelesen werden'); }
+    if (!Array.isArray(parsed)) throw new Error('Unerwartetes Antwortformat');
+
+    return parsed
+      .filter(c => c && typeof c.label === 'string' && Number.isFinite(c.value))
+      .map(c => ({ label: c.label, value: c.value, wild: !!c.wild }));
+  }
+
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>

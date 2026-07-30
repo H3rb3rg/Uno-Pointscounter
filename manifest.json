@@ -2,7 +2,7 @@
   "name": "UNO Flex Punktezähler",
   "short_name": "UNO Flex",
   "description": "Punktezähler für UNO Flex mit Fotoerkennung, Mehrspieler-Punktestand und Höchstpunktzahl.",
-  "start_url": "./uno-zaehler.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
