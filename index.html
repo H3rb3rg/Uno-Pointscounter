@@ -1461,10 +1461,16 @@
 
 
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  // Service Worker vorübergehend deaktiviert (Debugging von Cache-Problemen).
+  // Bereits registrierte Service Worker werden aktiv entfernt, damit alte,
+  // zwischengespeicherte Versionen der App nicht mehr ausgeliefert werden.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      regs.forEach(reg => reg.unregister());
     });
+    if (window.caches) {
+      caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+    }
   }
 </script>
 </body>
