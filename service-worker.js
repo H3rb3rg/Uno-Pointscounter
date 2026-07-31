@@ -1,4 +1,4 @@
-const CACHE_NAME = 'uno-flex-cache-v2';
+const CACHE_NAME = 'uno-flex-cache-v3';
 const ASSETS_TO_CACHE = [
   './index.html',
   './manifest.json',
@@ -10,7 +10,15 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
   );
-  self.skipWaiting();
+  // WICHTIG: kein self.skipWaiting() hier mehr – der neue Service Worker soll erst
+  // aktiv werden, wenn die Seite das per Nachricht bestätigt (siehe unten). So kann
+  // die App zuerst einen Update-Hinweis anzeigen, statt einfach im Hintergrund zu wechseln.
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('activate', (event) => {
@@ -22,19 +30,19 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Cache-first for the app shell, network-first fallback for everything else
-// (photo recognition calls to generativelanguage.googleapis.com always go to the network).
+// Network-first für die App-Shell: Bei Internetverbindung wird immer die aktuelle
+// Version geladen und der Cache aktualisiert. Nur offline greift der Cache als Fallback.
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-  if (url.origin !== self.location.origin) return; // let API calls pass straight through
+  if (url.origin !== self.location.origin) return; // externe Aufrufe (z.B. APIs) unberührt lassen
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request).then((response) => {
+    fetch(event.request)
+      .then((response) => {
         const clone = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         return response;
-      }).catch(() => cached);
-    })
+      })
+      .catch(() => caches.match(event.request))
   );
 });

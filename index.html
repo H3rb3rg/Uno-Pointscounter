@@ -1461,16 +1461,69 @@
 
 
 
-  // Service Worker vorübergehend deaktiviert (Debugging von Cache-Problemen).
-  // Bereits registrierte Service Worker werden aktiv entfernt, damit alte,
-  // zwischengespeicherte Versionen der App nicht mehr ausgeliefert werden.
+  // ================= APP-UPDATES ERKENNEN =================
+  // Registriert den Service Worker, prüft bei jedem Öffnen/Fokussieren aktiv auf eine
+  // neue Version und zeigt bei Fund einen Hinweis-Banner statt einfach die alte Version
+  // weiter auszuliefern oder mitten im Spiel einen stillen Reload auszulösen.
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(regs => {
-      regs.forEach(reg => reg.unregister());
-    });
-    if (window.caches) {
-      caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+    let updateReg = null;
+
+    function showUpdateBanner() {
+      if (document.getElementById('updateBanner')) return;
+      const banner = document.createElement('div');
+      banner.id = 'updateBanner';
+      banner.style.cssText =
+        'position:fixed; left:0; right:0; bottom:0; z-index:9999; background:var(--uno-red);' +
+        'color:var(--card-white); padding:12px 16px; display:flex; align-items:center;' +
+        'justify-content:space-between; gap:12px; box-shadow:0 -4px 12px rgba(0,0,0,0.4); font-size:0.85rem;';
+      banner.innerHTML =
+        '<span style="font-weight:800;">Neue Version verfügbar</span>' +
+        '<button id="updateNowBtn" style="background:var(--card-white); color:var(--uno-red); border:none;' +
+        'border-radius:999px; padding:8px 16px; font-weight:800; cursor:pointer;">Jetzt aktualisieren</button>';
+      document.body.appendChild(banner);
+      document.getElementById('updateNowBtn').addEventListener('click', () => {
+        if (updateReg && updateReg.waiting) {
+          updateReg.waiting.postMessage('SKIP_WAITING');
+        }
+      });
     }
+
+    navigator.serviceWorker.register('service-worker.js').then((reg) => {
+      updateReg = reg;
+
+      // Falls schon ein Update im Hintergrund fertig ist und nur auf Bestätigung wartet
+      if (reg.waiting && navigator.serviceWorker.controller) {
+        showUpdateBanner();
+      }
+
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            showUpdateBanner();
+          }
+        });
+      });
+
+      // Bei jedem Öffnen der App aktiv nach einer neueren Version fragen
+      reg.update();
+    }).catch(() => {});
+
+    // Reload, sobald der neue Service Worker nach Bestätigung übernimmt
+    let hasReloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (hasReloaded) return;
+      hasReloaded = true;
+      window.location.reload();
+    });
+
+    // Auch beim Zurückkehren zur App (z.B. vom Homescreen) erneut prüfen
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && updateReg) {
+        updateReg.update();
+      }
+    });
   }
 </script>
 </body>
