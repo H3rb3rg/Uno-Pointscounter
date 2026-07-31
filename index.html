@@ -11,6 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="UNO Flex">
 <script src="https://docs.opencv.org/4.9.0/opencv.js" async id="opencvScript"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <style>
   :root {
     --felt: #123524;
@@ -133,6 +134,17 @@
   .dash-header h2 { margin: 0; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 800; opacity: 0.7; }
   .dash-header .maxscore-pill { font-size: 0.72rem; opacity: 0.55; }
   .dash-header-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+  body.is-guest .host-only { display: none !important; }
+  body:not(.is-guest) .guest-only { display: none !important; }
+
+  .pick-player-btn {
+    background: var(--card-white); color: var(--felt-dark); border: none; border-radius: 12px;
+    padding: 14px 18px; font-size: 0.95rem; font-weight: 800; cursor: pointer; text-align: left;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.25);
+  }
+  .pick-player-btn:disabled { opacity: 0.4; cursor: default; }
+  .pick-player-btn .taken-tag { font-size: 0.7rem; opacity: 0.6; font-weight: 700; margin-left: 8px; }
   .icon-btn {
     background: rgba(253,250,243,0.1); border: none; color: var(--card-white); border-radius: 999px;
     padding: 8px 12px; font-size: 0.75rem; font-weight: 700; cursor: pointer;
@@ -416,13 +428,45 @@
       <p class="maxscore-hint">Wer die wenigsten Punkte hat, spielt am besten. Erreicht jemand diese Punktzahl, endet das Spiel und der Bestplatzierte wird gefeiert.</p>
 
       <div class="setup-actions">
-        <button class="btn btn-green" id="startBtn">Los geht's!</button>
+        <button class="btn btn-green" id="startBtn">Spiel erstellen</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ================= BEITRETEN: WARTEN AUF SPIELDATEN ================= -->
+  <div class="screen" id="screen-joinwait">
+    <div class="setup-card" style="text-align:center;">
+      <p class="intro" id="joinWaitText">Verbinde mit dem Spiel …</p>
+      <div class="spinner" style="width:24px; height:24px; border-width:3px; margin:10px auto;"></div>
+    </div>
+  </div>
+
+  <!-- ================= BEITRETEN: SPIELER WÄHLEN ================= -->
+  <div class="screen" id="screen-pickplayer">
+    <div class="setup-card">
+      <p class="intro">Wer bist du? Wähle deinen Namen aus der Liste des Spielleiters.</p>
+      <div id="pickPlayerList" style="display:flex; flex-direction:column; gap:10px;"></div>
     </div>
   </div>
 
   <!-- ================= DASHBOARD ================= -->
   <div class="screen" id="screen-dashboard">
+    <div class="settings-panel host-only" id="invitePanel">
+      <h3>Mitspieler einladen</h3>
+      <p>
+        Andere können per QR-Code oder Link live mitzählen. Sie sehen den Punktestand, können aber nur bei sich
+        selbst Punkte vormerken – nur du als Spielleiter kannst "Runde beenden" drücken.
+      </p>
+      <div id="inviteQr" style="background:#fff; display:inline-block; padding:10px; border-radius:10px;"></div>
+      <p style="font-size:0.8rem; margin-top:10px;">
+        Code: <strong id="inviteCode">–</strong><br>
+        <a id="inviteLink" href="#" target="_blank" rel="noopener" style="word-break:break-all;"></a>
+      </p>
+      <div class="key-status" style="margin-top:6px;">
+        <span id="connStatus">Noch keine Mitspieler verbunden.</span>
+      </div>
+    </div>
+
     <div class="settings-panel" id="settingsPanel">
       <h3>Kartenerkennung (lokal, selbst trainiert)</h3>
       <p>
@@ -456,18 +500,20 @@
         <div class="maxscore-pill" id="maxScorePill"></div>
       </div>
       <div class="dash-header-actions">
+        <button class="icon-btn host-only" id="toggleInviteBtn">🔗 Einladen</button>
         <button class="icon-btn" id="toggleSettingsBtn">⚙️ Kartenerkennung</button>
-        <button class="icon-btn" id="editPlayersBtn">Spieler / Limit</button>
+        <button class="icon-btn host-only" id="editPlayersBtn">Spieler / Limit</button>
       </div>
     </div>
     <p class="rule-hint">Wenigste Punkte = beste Platzierung 👑</p>
+    <p class="rule-hint guest-only" id="guestRoleHint" style="display:none;"></p>
 
     <div class="player-list" id="playerList"></div>
 
-    <div class="round-actions">
+    <div class="round-actions host-only">
       <button class="btn btn-green" id="endRoundBtn">Runde beenden</button>
     </div>
-    <div class="newgame-row">
+    <div class="newgame-row host-only">
       <button class="btn btn-ghost" id="newGameBtn">Neues Spiel (alle Punkte zurücksetzen)</button>
     </div>
   </div>
@@ -583,7 +629,7 @@
     </div>
 
     <div class="end-actions">
-      <button class="btn btn-green" id="endNewGameBtn">Neues Spiel starten</button>
+      <button class="btn btn-green host-only" id="endNewGameBtn">Neues Spiel starten</button>
       <button class="btn btn-ghost" id="endBackBtn">Zurück zum Punktestand</button>
     </div>
   </div>
@@ -611,6 +657,158 @@
   let pid = 0;
   let currentPlayerId = null;
   let maxScore = 500;
+
+  // ================= MULTIPLAYER (Trystero, serverlos, kein Account) =================
+  const TRYSTERO_APP_ID = 'unoflex-punktezaehler-v1';
+  const urlParams = new URLSearchParams(location.search);
+  const joinCodeFromUrl = (urlParams.get('join') || '').toUpperCase().trim();
+  let isHost = !joinCodeFromUrl;
+  let currentRoomCode = null;
+  let room = null;
+  let stateAction = null;
+  let claimAction = null;
+  let roundAction = null;
+  let myClaimedPlayerId = null;
+  let claimedMap = {}; // playerId -> true, best-effort, nicht hart erzwungen
+  let joinRoomFn = null;
+
+  document.body.classList.toggle('is-guest', !isHost);
+
+  async function loadTrystero() {
+    if (joinRoomFn) return joinRoomFn;
+    const mod = await import('https://esm.run/trystero');
+    joinRoomFn = mod.joinRoom;
+    return joinRoomFn;
+  }
+
+  function generateRoomCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 5; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    return code;
+  }
+
+  function buildStateSnapshot(extra) {
+    return Object.assign({
+      players: players.map(p => ({ ...p })),
+      maxScore,
+      claimedMap
+    }, extra || {});
+  }
+
+  function broadcastState(extra) {
+    if (room && stateAction) stateAction.send(buildStateSnapshot(extra));
+  }
+
+  function setupHostRoomHandlers() {
+    room.onPeerJoin = (peerId) => {
+      stateAction.send(buildStateSnapshot(), { target: peerId });
+      updateConnStatus();
+    };
+    room.onPeerLeave = () => updateConnStatus();
+
+    roundAction.onMessage = (data) => {
+      const p = players.find(x => x.id === data.playerId);
+      if (p) {
+        p.roundPoints = data.roundPoints;
+        if (document.getElementById('screen-dashboard').classList.contains('active')) renderDashboard();
+        broadcastState();
+      }
+    };
+
+    claimAction.onMessage = (data) => {
+      claimedMap[data.playerId] = true;
+      broadcastState();
+    };
+  }
+
+  function updateConnStatus() {
+    const el = document.getElementById('connStatus');
+    if (!el || !room) return;
+    const n = Object.keys(room.getPeers ? room.getPeers() : {}).length;
+    el.textContent = n === 0
+      ? 'Noch keine Mitspieler verbunden.'
+      : `${n} Mitspieler-Gerät(e) verbunden.`;
+  }
+
+  async function hostCreateOrUpdateRoom() {
+    if (currentRoomCode) { broadcastState(); return; } // Raum existiert schon, nur Update senden
+    const joinRoom = await loadTrystero();
+    currentRoomCode = generateRoomCode();
+    room = joinRoom({ appId: TRYSTERO_APP_ID }, currentRoomCode);
+    stateAction = room.makeAction('state');
+    claimAction = room.makeAction('claim');
+    roundAction = room.makeAction('round');
+    setupHostRoomHandlers();
+    renderInvitePanel();
+  }
+
+  function renderInvitePanel() {
+    document.getElementById('inviteCode').textContent = currentRoomCode || '–';
+    const url = `${location.origin}${location.pathname}?join=${currentRoomCode}`;
+    const linkEl = document.getElementById('inviteLink');
+    linkEl.href = url;
+    linkEl.textContent = url;
+    const qrEl = document.getElementById('inviteQr');
+    qrEl.innerHTML = '';
+    if (window.QRCode) new QRCode(qrEl, { text: url, width: 160, height: 160 });
+  }
+
+  async function guestJoinRoom(code) {
+    const joinRoom = await loadTrystero();
+    currentRoomCode = code;
+    room = joinRoom({ appId: TRYSTERO_APP_ID }, code);
+    stateAction = room.makeAction('state');
+    claimAction = room.makeAction('claim');
+    roundAction = room.makeAction('round');
+
+    let receivedFirstState = false;
+    stateAction.onMessage = (data) => {
+      players = data.players.map(p => ({ ...p }));
+      maxScore = data.maxScore;
+      claimedMap = data.claimedMap || {};
+
+      if (data.justEnded) {
+        showEndScreen(data.justEnded.winners, data.justEnded.minScore);
+      } else if (!receivedFirstState) {
+        receivedFirstState = true;
+        showPickPlayerScreen();
+      } else if (document.getElementById('screen-dashboard').classList.contains('active')) {
+        renderDashboard();
+      } else if (document.getElementById('screen-pickplayer').classList.contains('active')) {
+        renderPickPlayerList();
+      }
+    };
+
+    room.onPeerJoin = () => {};
+  }
+
+  function showPickPlayerScreen() {
+    showScreen('pickplayer');
+    renderPickPlayerList();
+  }
+
+  function renderPickPlayerList() {
+    const list = document.getElementById('pickPlayerList');
+    list.innerHTML = '';
+    players.forEach(p => {
+      const btn = document.createElement('button');
+      btn.className = 'pick-player-btn';
+      const taken = claimedMap[p.id] && p.id !== myClaimedPlayerId;
+      btn.disabled = !!taken;
+      btn.innerHTML = p.name + (taken ? '<span class="taken-tag">bereits gewählt</span>' : '');
+      btn.addEventListener('click', () => {
+        myClaimedPlayerId = p.id;
+        claimedMap[p.id] = true;
+        claimAction.send({ playerId: p.id });
+        document.getElementById('guestRoleHint').textContent = `Du zählst als: ${p.name}`;
+        document.getElementById('guestRoleHint').style.display = 'block';
+        showScreen('dashboard');
+        renderDashboard();
+      });
+      list.appendChild(btn);
+    });
+  }
 
   let hand = [];
   let uid = 0;
@@ -772,7 +970,8 @@
     if (setupCount < 10) { setupCount++; renderNameInputs(); countNum.textContent = setupCount; }
   });
 
-  document.getElementById('startBtn').addEventListener('click', () => {
+  const startBtn = document.getElementById('startBtn');
+  startBtn.addEventListener('click', async () => {
     const existingByName = {};
     players.forEach(p => { existingByName[p.name] = p; });
 
@@ -789,6 +988,16 @@
 
     showScreen('dashboard');
     renderDashboard();
+
+    startBtn.disabled = true;
+    startBtn.textContent = 'Verbinde …';
+    try {
+      await hostCreateOrUpdateRoom();
+    } catch (err) {
+      console.error(err);
+    }
+    startBtn.disabled = false;
+    startBtn.textContent = currentRoomCode ? 'Spiel aktualisieren' : 'Spiel erstellen';
   });
 
   renderNameInputs();
@@ -840,7 +1049,12 @@
       const clearRoundBtn = document.createElement('button');
       clearRoundBtn.textContent = '✕';
       clearRoundBtn.title = 'Rundenpunkte zurücksetzen';
-      clearRoundBtn.addEventListener('click', () => { p.roundPoints = 0; renderDashboard(); });
+      clearRoundBtn.addEventListener('click', () => {
+        p.roundPoints = 0;
+        renderDashboard();
+        if (isHost) broadcastState();
+        else if (roundAction) roundAction.send({ playerId: p.id, roundPoints: 0 });
+      });
       roundBadge.appendChild(clearRoundBtn);
 
       info.appendChild(nameEl);
@@ -848,13 +1062,17 @@
       info.appendChild(scoreRow);
       info.appendChild(roundBadge);
 
-      const addBtn = document.createElement('button');
-      addBtn.className = 'player-add-btn' + (p.roundPoints ? ' has-round' : '');
-      addBtn.textContent = p.roundPoints ? `+ Punkte (${p.roundPoints})` : '+ Punkte';
-      addBtn.addEventListener('click', () => openCounterFor(p.id));
-
       card.appendChild(info);
-      card.appendChild(addBtn);
+
+      const canEdit = isHost || p.id === myClaimedPlayerId;
+      if (canEdit) {
+        const addBtn = document.createElement('button');
+        addBtn.className = 'player-add-btn' + (p.roundPoints ? ' has-round' : '');
+        addBtn.textContent = p.roundPoints ? `+ Punkte (${p.roundPoints})` : '+ Punkte';
+        addBtn.addEventListener('click', () => openCounterFor(p.id));
+        card.appendChild(addBtn);
+      }
+
       playerListEl.appendChild(card);
     });
   }
@@ -865,12 +1083,18 @@
     maxScoreInput.value = maxScore;
     countNum.textContent = setupCount;
     renderNameInputs();
+    startBtn.textContent = currentRoomCode ? 'Spiel aktualisieren' : 'Spiel erstellen';
     showScreen('setup');
   });
 
   document.getElementById('newGameBtn').addEventListener('click', () => {
     players.forEach(p => { p.score = 0; p.roundPoints = 0; });
     renderDashboard();
+    if (isHost) broadcastState();
+  });
+
+  document.getElementById('toggleInviteBtn').addEventListener('click', () => {
+    document.getElementById('invitePanel').classList.toggle('visible');
   });
 
   // ---- Runde beenden: Punkte addieren + FLIP-Sortier-Animation + Count-up ----
@@ -913,6 +1137,9 @@
     });
 
     setTimeout(() => { checkGameEnd(); }, 750);
+
+    // Neuen Punktestand (Runde beendet, Rundenpunkte zurückgesetzt) an alle Mitspieler senden
+    if (isHost) broadcastState();
   });
 
   function animateCount(el, from, to, duration) {
@@ -936,6 +1163,7 @@
     const minScore = Math.min(...players.map(p => p.score));
     const winners = players.filter(p => p.score === minScore);
     showEndScreen(winners, minScore);
+    if (isHost) broadcastState({ justEnded: { winners: winners.map(w => ({ name: w.name })), minScore } });
   }
 
   function showEndScreen(winners, minScore) {
@@ -977,6 +1205,7 @@
     players.forEach(p => { p.score = 0; p.roundPoints = 0; });
     showScreen('dashboard');
     renderDashboard();
+    if (isHost) broadcastState();
   });
 
   document.getElementById('endBackBtn').addEventListener('click', () => {
@@ -986,8 +1215,19 @@
 
   // ================= SCREEN SWITCHING =================
   function showScreen(name) {
-    ['setup', 'dashboard', 'counter', 'end'].forEach(s => {
+    ['setup', 'dashboard', 'counter', 'end', 'joinwait', 'pickplayer'].forEach(s => {
       document.getElementById(`screen-${s}`).classList.toggle('active', s === name);
+    });
+  }
+
+  // Beitritts-Modus: sofort verbinden statt Setup zu zeigen
+  if (joinCodeFromUrl) {
+    showScreen('joinwait');
+    document.getElementById('joinWaitText').textContent = `Verbinde mit Spiel ${joinCodeFromUrl} …`;
+    guestJoinRoom(joinCodeFromUrl).catch(err => {
+      console.error(err);
+      document.getElementById('joinWaitText').textContent =
+        'Verbindung fehlgeschlagen. Bitte Link/QR-Code erneut versuchen oder prüfen, ob der Spielleiter das Spiel noch geöffnet hat.';
     });
   }
 
@@ -1007,7 +1247,11 @@
   document.getElementById('commitBtn').addEventListener('click', () => {
     const total = hand.reduce((sum, c) => sum + c.value, 0);
     const p = players.find(x => x.id === currentPlayerId);
-    if (p) p.roundPoints += total;
+    if (p) {
+      p.roundPoints += total;
+      if (isHost) broadcastState();
+      else if (roundAction) roundAction.send({ playerId: p.id, roundPoints: p.roundPoints });
+    }
     showScreen('dashboard');
     renderDashboard();
   });
