@@ -694,14 +694,17 @@
   trainCaptureInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    trainStatus.textContent = '';
+    trainStatus.innerHTML = '<span class="spinner"></span>Karte wird erkannt …';
     try {
-      const { img } = await loadImageElement(file);
-      const hash = computeDHash(img);
-      const thumb = makeThumbnailB64(img, 90);
+      const { canvas, autoCropped } = await getNormalizedCardCanvas(file);
+      const hash = computeDHash(canvas);
+      const thumb = makeThumbnailB64(canvas, 90);
       currentTrainCapture = { hash, thumb };
       trainPreviewImg.src = `data:image/jpeg;base64,${thumb}`;
       trainPreviewWrap.style.display = 'block';
+      trainStatus.textContent = autoCropped
+        ? 'Karte automatisch freigestellt und geradegerückt.'
+        : 'Konnte die Karte nicht automatisch freistellen (z. B. offline) – bitte die Karte möglichst formatfüllend, gut ausgeleuchtet und vor dunklem Untergrund erneut fotografieren.';
     } catch (err) {
       trainStatus.textContent = 'Foto konnte nicht verarbeitet werden.';
     }
@@ -1138,12 +1141,15 @@
     if (!file) return;
 
     resetReview();
+    scanStatus.innerHTML = '<span class="spinner"></span>Karte wird erkannt …';
     try {
-      const { img } = await loadImageElement(file);
-      currentPhotoHash = computeDHash(img);
-      previewImg.src = `data:image/jpeg;base64,${makeThumbnailB64(img, 220)}`;
+      const { canvas, autoCropped } = await getNormalizedCardCanvas(file);
+      currentPhotoHash = computeDHash(canvas);
+      previewImg.src = `data:image/jpeg;base64,${makeThumbnailB64(canvas, 220)}`;
       scanPreview.classList.add('visible');
-      scanStatus.textContent = '';
+      scanStatus.textContent = autoCropped
+        ? ''
+        : 'Hinweis: Karte konnte nicht automatisch freigestellt werden – Vergleich nutzt das ganze Foto.';
       analyzeBtn.disabled = false;
     } catch (err) {
       scanStatus.textContent = 'Foto konnte nicht gelesen werden. Bitte erneut versuchen.';
@@ -1369,6 +1375,25 @@
     out.width = Math.round(r.w); out.height = Math.round(r.h);
     out.getContext('2d').drawImage(tmp, diag / 2 - r.w / 2, diag / 2 - r.h / 2, r.w, r.h, 0, 0, r.w, r.h);
     return out;
+  }
+
+  // Versucht, in einem Einzelkarten-Foto genau eine Karte zu finden, freizustellen und
+  // geradezurücken (per OpenCV.js-Kantenerkennung). Fällt bei Fehlschlag auf das
+  // unbeschnittene Foto zurück, damit Training/Erkennung trotzdem funktionieren.
+  async function getNormalizedCardCanvas(file) {
+    const { img } = await loadImageElement(file);
+    try {
+      await waitForOpenCv(6000);
+      const workCanvas = drawToWorkCanvas(img, 1000);
+      const regions = detectCardRegions(workCanvas);
+      if (regions.length > 0) {
+        const best = regions.reduce((a, b) => (a.area > b.area ? a : b));
+        return { canvas: extractCardCanvas(workCanvas, best), autoCropped: true };
+      }
+    } catch (e) {
+      // OpenCV nicht verfügbar (z.B. offline) oder keine Kontur gefunden – Fallback unten
+    }
+    return { canvas: drawToWorkCanvas(img, 500), autoCropped: false };
   }
 
   fanCameraInput.addEventListener('change', async (e) => {
