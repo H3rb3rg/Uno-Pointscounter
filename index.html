@@ -10,8 +10,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="UNO Flex">
-<script src="https://docs.opencv.org/4.9.0/opencv.js" async id="opencvScript"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="firebase-config.js"></script>
+<script src="firebase-config.js"></script>
 <style>
   :root {
     --felt: #123524;
@@ -254,7 +255,6 @@
     font-size: 0.95rem; font-weight: 800; cursor: pointer; box-shadow: 0 3px 0 rgba(0,0,0,0.25);
     display: inline-flex; align-items: center; gap: 8px;
   }
-  #cameraInput { display: none; }
   .scan-preview { margin-top: 14px; display: none; }
   .scan-preview.visible { display: block; }
   .scan-preview img { max-width: 100%; max-height: 220px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
@@ -454,8 +454,9 @@
     <div class="settings-panel host-only" id="invitePanel">
       <h3>Mitspieler einladen</h3>
       <p>
-        Andere können per QR-Code oder Link live mitzählen. Sie sehen den Punktestand, können aber nur bei sich
-        selbst Punkte vormerken – nur du als Spielleiter kannst "Runde beenden" drücken.
+        Andere können per QR-Code oder Link jederzeit beitreten (auch später, unabhängig davon ob dein Handy
+        gerade online ist) und live mitzählen. Sie sehen den Punktestand, können aber nur bei sich selbst Punkte
+        vormerken – nur du als Spielleiter kannst "Runde beenden" drücken. Das Spiel bleibt dauerhaft bestehen.
       </p>
       <div id="inviteQr" style="background:#fff; display:inline-block; padding:10px; border-radius:10px;"></div>
       <p style="font-size:0.8rem; margin-top:10px;">
@@ -463,35 +464,8 @@
         <a id="inviteLink" href="#" target="_blank" rel="noopener" style="word-break:break-all;"></a>
       </p>
       <div class="key-status" style="margin-top:6px;">
-        <span id="connStatus">Noch keine Mitspieler verbunden.</span>
+        <span id="connStatus">Verbinde …</span>
       </div>
-    </div>
-
-    <div class="settings-panel" id="settingsPanel">
-      <h3>Kartenerkennung (lokal, selbst trainiert)</h3>
-      <p>
-        Die Bibliothek ist aktuell leer (<span id="trainCount">0</span> Referenzkarten). Fotografiere jede Kartenart
-        deines eigenen Decks einmal einzeln, vergib Name und Punktzahl und füge sie hinzu – läuft komplett offline,
-        ohne Account, ohne Kosten. Erst danach kann die Foto-Erkennung Karten vorschlagen.
-      </p>
-      <label class="scan-capture-btn" for="trainCaptureInput" style="display:inline-flex;">📷 Neue Kartenart trainieren</label>
-      <input type="file" id="trainCaptureInput" accept="image/*" capture="environment" style="display:none;">
-
-      <div id="trainPreviewWrap" style="margin-top:12px; display:none;">
-        <img id="trainPreviewImg" style="max-width:100%; max-height:140px; border-radius:8px; display:block; margin-bottom:10px;" alt="Vorschau der fotografierten Karte">
-        <div class="key-row" style="align-items:center;">
-          <input type="text" id="trainNameInput" placeholder="Name, z.B. Flexkarte" style="flex:1;">
-          <input type="number" id="trainValueInput" placeholder="Punkte" style="width:70px; text-align:center;">
-          <button id="trainSaveBtn">Hinzufügen</button>
-        </div>
-        <label style="display:flex; align-items:center; gap:6px; margin-top:8px; font-size:0.78rem; color:var(--felt-dark);">
-          <input type="checkbox" id="trainWildInput"> schwarze Farbwahl-/Wild-Karte
-        </label>
-      </div>
-      <div class="scan-status" id="trainStatus" style="text-align:left;"></div>
-
-      <h3 style="margin-top:16px;">Referenzkarten in der Bibliothek</h3>
-      <div id="trainLibraryList" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
     </div>
 
     <div class="dash-header">
@@ -501,7 +475,6 @@
       </div>
       <div class="dash-header-actions">
         <button class="icon-btn host-only" id="toggleInviteBtn">🔗 Einladen</button>
-        <button class="icon-btn" id="toggleSettingsBtn">⚙️ Kartenerkennung</button>
         <button class="icon-btn host-only" id="editPlayersBtn">Spieler / Limit</button>
       </div>
     </div>
@@ -556,49 +529,6 @@
       <div class="btn-grid cols-2" id="wildGrid"></div>
     </div>
 
-    <div class="scan-block">
-      <div class="scan-block-header">
-        <h3>Foto-Erkennung</h3>
-      </div>
-      <p class="scan-hint" id="scanHintText">Fotografiere eine einzelne Karte – Vergleich mit deiner Referenzbibliothek.</p>
-      <label class="scan-capture-btn" for="cameraInput" id="captureLabel">📷 Karte fotografieren</label>
-      <input type="file" id="cameraInput" accept="image/*" capture="environment">
-      <div class="scan-preview" id="scanPreview">
-        <img id="previewImg" alt="Vorschau der fotografierten Karte">
-        <div class="scan-actions">
-          <button class="btn btn-green" id="analyzeBtn">Karte vergleichen</button>
-          <button class="btn btn-ghost" id="discardBtn">Verwerfen</button>
-        </div>
-        <div class="scan-status" id="scanStatus"></div>
-      </div>
-      <div class="review-block" id="reviewBlock">
-        <h3>Beste Treffer – tippe die richtige Karte an</h3>
-        <div class="review-list" id="reviewList"></div>
-        <div class="review-actions">
-          <button class="btn btn-ghost" id="rejectBtn">Keiner passt / abbrechen</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="scan-block fan-block">
-      <div class="scan-block-header">
-        <h3>Fächerfoto <span class="experimental-tag">experimentell</span></h3>
-      </div>
-      <p class="scan-hint">
-        Fotografiere mehrere Karten auf einmal (möglichst wenig überlappend, guter Kontrast zum Untergrund).
-        Läuft weiterhin komplett lokal – nur der einmalige Bibliotheksdownload (OpenCV.js, ca. 8&nbsp;MB) braucht
-        beim allerersten Mal Internet.
-      </p>
-      <label class="scan-capture-btn" for="fanCameraInput">🖐️ Fächerfoto aufnehmen</label>
-      <input type="file" id="fanCameraInput" accept="image/*" capture="environment">
-      <div class="scan-status" id="fanStatus"></div>
-      <div class="fan-results" id="fanResults"></div>
-      <div class="scan-actions" id="fanActions" style="display:none;">
-        <button class="btn btn-blue" id="fanAddBtn">Ausgewählte zur Hand hinzufügen</button>
-        <button class="btn btn-ghost" id="fanDiscardBtn">Verwerfen</button>
-      </div>
-    </div>
-
     <div class="commit-bar">
       <button class="btn btn-blue" id="commitBtn">Übernehmen (für diese Runde vormerken)</button>
       <button class="btn btn-ghost" id="cancelBtn">Abbrechen</button>
@@ -607,8 +537,6 @@
     <div class="rules-note">
       Zahlen 0–9 = aufgedruckter Wert · Aussetzen / Richtungswechsel / +2 = 20 Punkte ·
       Farbwahl / Farbwahl +4 = 50 Punkte<br>
-      Die Foto-Erkennung läuft komplett lokal auf diesem Gerät (Bildvergleich mit vortrainierten Referenzkarten,
-      keine Cloud, kein Internet nötig) – bitte den vorgeschlagenen Treffer immer kurz prüfen.<br>
       Übernommene Punkte werden erst zur Gesamtpunktzahl addiert, wenn auf der Punktestand-Seite
       „Runde beenden" gedrückt wird.
     </div>
@@ -658,27 +586,33 @@
   let currentPlayerId = null;
   let maxScore = 500;
 
-  // ================= MULTIPLAYER (Trystero, serverlos, kein Account) =================
-  const TRYSTERO_APP_ID = 'unoflex-punktezaehler-v1';
+  // ================= MULTIPLAYER (Firebase Firestore, wie bei Padelmanager) =================
+  // Persistente, geräteübergreifende Speicherung. Kein Login für Mitspieler nötig - jede Person
+  // bekommt nur eine zufällige, geräte-lokale Identität. Nur der Betreiber (du) richtet einmalig
+  // ein kostenloses Firebase-Projekt ein und trägt die Zugangsdaten in firebase-config.js ein.
   const urlParams = new URLSearchParams(location.search);
   const joinCodeFromUrl = (urlParams.get('join') || '').toUpperCase().trim();
   let isHost = !joinCodeFromUrl;
   let currentRoomCode = null;
-  let room = null;
-  let stateAction = null;
-  let claimAction = null;
-  let roundAction = null;
   let myClaimedPlayerId = null;
   let claimedMap = {}; // playerId -> true, best-effort, nicht hart erzwungen
-  let joinRoomFn = null;
+  let db = null;
+  let firestoreMod = null;
+  let pollTimer = null;
+  let lastPushedJson = '';
 
   document.body.classList.toggle('is-guest', !isHost);
 
-  async function loadTrystero() {
-    if (joinRoomFn) return joinRoomFn;
-    const mod = await import('https://esm.run/trystero');
-    joinRoomFn = mod.joinRoom;
-    return joinRoomFn;
+  async function loadFirestore() {
+    if (db) return db;
+    if (!window.FIREBASE_CONFIG || !window.FIREBASE_CONFIG.projectId) {
+      throw new Error('firebase-config.js fehlt oder ist nicht ausgefüllt.');
+    }
+    const appMod = await import('https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js');
+    firestoreMod = await import('https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore-lite.js');
+    const app = appMod.initializeApp(window.FIREBASE_CONFIG);
+    db = firestoreMod.getFirestore(app);
+    return db;
   }
 
   function generateRoomCode() {
@@ -692,55 +626,84 @@
     return Object.assign({
       players: players.map(p => ({ ...p })),
       maxScore,
-      claimedMap
+      claimedMap,
+      updatedAt: Date.now()
     }, extra || {});
   }
 
-  function broadcastState(extra) {
-    if (room && stateAction) stateAction.send(buildStateSnapshot(extra));
+  async function pushState(extra) {
+    if (!db || !currentRoomCode) return;
+    const snap = buildStateSnapshot(extra);
+    lastPushedJson = JSON.stringify(snap);
+    try {
+      const ref = firestoreMod.doc(db, 'games', currentRoomCode);
+      await firestoreMod.setDoc(ref, snap);
+    } catch (err) {
+      console.error('Speichern fehlgeschlagen:', err);
+      setConnStatus('⚠️ Speichern fehlgeschlagen – Internetverbindung/Firebase-Setup prüfen.');
+    }
   }
 
-  function setupHostRoomHandlers() {
-    room.onPeerJoin = (peerId) => {
-      stateAction.send(buildStateSnapshot(), { target: peerId });
-      updateConnStatus();
-    };
-    room.onPeerLeave = () => updateConnStatus();
-
-    roundAction.onMessage = (data) => {
-      const p = players.find(x => x.id === data.playerId);
-      if (p) {
-        p.roundPoints = data.roundPoints;
-        if (document.getElementById('screen-dashboard').classList.contains('active')) renderDashboard();
-        broadcastState();
+  async function pullState() {
+    if (!db || !currentRoomCode) return;
+    try {
+      const ref = firestoreMod.doc(db, 'games', currentRoomCode);
+      const snap = await firestoreMod.getDoc(ref);
+      if (!snap.exists()) {
+        setConnStatus('⚠️ Spiel wurde nicht gefunden (evtl. gelöscht).');
+        return;
       }
-    };
+      const data = snap.data();
+      const json = JSON.stringify(data);
+      if (json === lastPushedJson) { setConnStatus(); return; } // eigene Änderung, nichts Neues
 
-    claimAction.onMessage = (data) => {
-      claimedMap[data.playerId] = true;
-      broadcastState();
-    };
+      players = data.players.map(p => ({ ...p }));
+      maxScore = data.maxScore;
+      claimedMap = data.claimedMap || {};
+      lastPushedJson = json;
+
+      if (data.justEnded) {
+        showEndScreen(
+          players.filter(p => data.justEnded.winnerIds.includes(p.id)),
+          data.justEnded.minScore
+        );
+      } else if (document.getElementById('screen-dashboard').classList.contains('active')) {
+        renderDashboard();
+      } else if (document.getElementById('screen-pickplayer').classList.contains('active')) {
+        renderPickPlayerList();
+      }
+      setConnStatus();
+    } catch (err) {
+      console.error(err);
+      setConnStatus('⚠️ Verbindung zu Firebase fehlgeschlagen.');
+    }
   }
 
-  function updateConnStatus() {
+  function setConnStatus(customMsg) {
     const el = document.getElementById('connStatus');
-    if (!el || !room) return;
-    const n = Object.keys(room.getPeers ? room.getPeers() : {}).length;
-    el.textContent = n === 0
-      ? 'Noch keine Mitspieler verbunden.'
-      : `${n} Mitspieler-Gerät(e) verbunden.`;
+    if (!el) return;
+    if (customMsg) { el.textContent = customMsg; return; }
+    const time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    el.textContent = `🟢 Synchronisiert (zuletzt ${time})`;
+  }
+
+  function startPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(pullState, 3500);
   }
 
   async function hostCreateOrUpdateRoom() {
-    if (currentRoomCode) { broadcastState(); return; } // Raum existiert schon, nur Update senden
-    const joinRoom = await loadTrystero();
-    currentRoomCode = generateRoomCode();
-    room = joinRoom({ appId: TRYSTERO_APP_ID }, currentRoomCode);
-    stateAction = room.makeAction('state');
-    claimAction = room.makeAction('claim');
-    roundAction = room.makeAction('round');
-    setupHostRoomHandlers();
+    try {
+      await loadFirestore();
+    } catch (err) {
+      setConnStatus('⚠️ ' + err.message + ' Spiel läuft vorerst nur lokal auf diesem Gerät.');
+      return;
+    }
+    if (!currentRoomCode) currentRoomCode = generateRoomCode();
+    await pushState();
+    startPolling();
     renderInvitePanel();
+    setConnStatus();
   }
 
   function renderInvitePanel() {
@@ -755,32 +718,41 @@
   }
 
   async function guestJoinRoom(code) {
-    const joinRoom = await loadTrystero();
     currentRoomCode = code;
-    room = joinRoom({ appId: TRYSTERO_APP_ID }, code);
-    stateAction = room.makeAction('state');
-    claimAction = room.makeAction('claim');
-    roundAction = room.makeAction('round');
+    try {
+      await loadFirestore();
+    } catch (err) {
+      document.getElementById('joinWaitText').textContent =
+        'Verbindung fehlgeschlagen: ' + err.message + ' Bitte beim Spielleiter nachfragen.';
+      return;
+    }
+    const ref = firestoreMod.doc(db, 'games', currentRoomCode);
+    const snap = await firestoreMod.getDoc(ref);
+    if (!snap.exists()) {
+      document.getElementById('joinWaitText').textContent =
+        'Kein Spiel mit diesem Code gefunden. Bitte Link/QR-Code erneut versuchen.';
+      return;
+    }
+    const data = snap.data();
+    players = data.players.map(p => ({ ...p }));
+    maxScore = data.maxScore;
+    claimedMap = data.claimedMap || {};
+    lastPushedJson = JSON.stringify(data);
 
-    let receivedFirstState = false;
-    stateAction.onMessage = (data) => {
-      players = data.players.map(p => ({ ...p }));
-      maxScore = data.maxScore;
-      claimedMap = data.claimedMap || {};
-
-      if (data.justEnded) {
-        showEndScreen(data.justEnded.winners, data.justEnded.minScore);
-      } else if (!receivedFirstState) {
-        receivedFirstState = true;
-        showPickPlayerScreen();
-      } else if (document.getElementById('screen-dashboard').classList.contains('active')) {
-        renderDashboard();
-      } else if (document.getElementById('screen-pickplayer').classList.contains('active')) {
-        renderPickPlayerList();
-      }
-    };
-
-    room.onPeerJoin = () => {};
+    const savedClaimRaw = localStorage.getItem('unoflex_claim_' + currentRoomCode);
+    const savedClaim = savedClaimRaw !== null ? Number(savedClaimRaw) : null;
+    if (savedClaim !== null && players.some(p => p.id === savedClaim)) {
+      myClaimedPlayerId = savedClaim;
+      document.getElementById('guestRoleHint').textContent =
+        `Du zählst als: ${players.find(p => p.id === savedClaim).name}`;
+      document.getElementById('guestRoleHint').style.display = 'block';
+      showScreen('dashboard');
+      renderDashboard();
+    } else {
+      showPickPlayerScreen();
+    }
+    startPolling();
+    setConnStatus();
   }
 
   function showPickPlayerScreen() {
@@ -797,10 +769,11 @@
       const taken = claimedMap[p.id] && p.id !== myClaimedPlayerId;
       btn.disabled = !!taken;
       btn.innerHTML = p.name + (taken ? '<span class="taken-tag">bereits gewählt</span>' : '');
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         myClaimedPlayerId = p.id;
         claimedMap[p.id] = true;
-        claimAction.send({ playerId: p.id });
+        try { localStorage.setItem('unoflex_claim_' + currentRoomCode, p.id); } catch (e) {}
+        await pushState();
         document.getElementById('guestRoleHint').textContent = `Du zählst als: ${p.name}`;
         document.getElementById('guestRoleHint').style.display = 'block';
         showScreen('dashboard');
@@ -810,131 +783,11 @@
     });
   }
 
+
   let hand = [];
   let uid = 0;
   let pendingReview = [];
   let currentPhoto = null;
-
-  // ================= LOKALE, VORTRAINIERTE KARTENBIBLIOTHEK =================
-  // Diese 14 Referenzkarten wurden aus dem vom Nutzer bereitgestellten Foto seines
-  // eigenen UNO-Decks ausgeschnitten (ein Beispiel pro Kartenwert).
-  const SEED_LIBRARY = [];
-
-  const LIBRARY_STORAGE_KEY = 'unoflex_local_card_library_v2';
-
-  const settingsPanel = document.getElementById('settingsPanel');
-  const captureLabel = document.getElementById('captureLabel');
-  const scanHintText = document.getElementById('scanHintText');
-
-  const trainCaptureInput = document.getElementById('trainCaptureInput');
-  const trainPreviewWrap = document.getElementById('trainPreviewWrap');
-  const trainPreviewImg = document.getElementById('trainPreviewImg');
-  const trainNameInput = document.getElementById('trainNameInput');
-  const trainValueInput = document.getElementById('trainValueInput');
-  const trainWildInput = document.getElementById('trainWildInput');
-  const trainSaveBtn = document.getElementById('trainSaveBtn');
-  const trainStatus = document.getElementById('trainStatus');
-  const trainLibraryList = document.getElementById('trainLibraryList');
-  const trainCountEl = document.getElementById('trainCount');
-
-  let currentTrainCapture = null; // { hash, thumb }
-
-  function getCustomLibrary() {
-    try {
-      const raw = localStorage.getItem(LIBRARY_STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch (e) { return []; }
-  }
-  function saveCustomLibrary(lib) {
-    try { localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(lib)); } catch (e) {}
-  }
-  function getFullLibrary() {
-    return [...SEED_LIBRARY, ...getCustomLibrary()];
-  }
-
-  function refreshLibraryUI() {
-    const custom = getCustomLibrary();
-    const all = getFullLibrary();
-    trainCountEl.textContent = all.length;
-    trainLibraryList.innerHTML = '';
-    all.forEach((entry, i) => {
-      const isCustom = i >= SEED_LIBRARY.length;
-      const item = document.createElement('div');
-      item.style.cssText = 'background:var(--card-white); border-radius:10px; padding:6px; width:70px; text-align:center; position:relative;';
-      const img = document.createElement('img');
-      img.src = `data:image/jpeg;base64,${entry.thumb}`;
-      img.style.cssText = 'width:100%; height:48px; object-fit:cover; border-radius:6px; display:block;';
-      const label = document.createElement('div');
-      label.style.cssText = 'color:var(--felt-dark); font-size:0.58rem; font-weight:700; margin-top:4px; line-height:1.2;';
-      label.textContent = `${entry.name} · ${entry.value}`;
-      item.appendChild(img);
-      item.appendChild(label);
-      if (isCustom) {
-        const delBtn = document.createElement('button');
-        delBtn.textContent = '✕';
-        delBtn.style.cssText = 'position:absolute; top:2px; right:2px; background:rgba(0,0,0,0.55); color:#fff; border:none; border-radius:50%; width:16px; height:16px; font-size:0.55rem; cursor:pointer; line-height:1;';
-        delBtn.addEventListener('click', () => {
-          const updated = getCustomLibrary().filter(e => e.id !== entry.id);
-          saveCustomLibrary(updated);
-          refreshLibraryUI();
-        });
-        item.appendChild(delBtn);
-      }
-      trainLibraryList.appendChild(item);
-    });
-    scanHintText.textContent = `Fotografiere eine einzelne Karte – Vergleich mit ${all.length} Referenzkarten.`;
-  }
-
-  document.getElementById('toggleSettingsBtn').addEventListener('click', () => {
-    settingsPanel.classList.toggle('visible');
-  });
-
-  trainCaptureInput.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    trainStatus.innerHTML = '<span class="spinner"></span>Karte wird erkannt …';
-    try {
-      const { canvas, autoCropped } = await getNormalizedCardCanvas(file);
-      const hash = computeDHash(canvas);
-      const thumb = makeThumbnailB64(canvas, 90);
-      currentTrainCapture = { hash, thumb };
-      trainPreviewImg.src = `data:image/jpeg;base64,${thumb}`;
-      trainPreviewWrap.style.display = 'block';
-      trainStatus.textContent = autoCropped
-        ? 'Karte automatisch freigestellt und geradegerückt.'
-        : 'Konnte die Karte nicht automatisch freistellen (z. B. offline) – bitte die Karte möglichst formatfüllend, gut ausgeleuchtet und vor dunklem Untergrund erneut fotografieren.';
-    } catch (err) {
-      trainStatus.textContent = 'Foto konnte nicht verarbeitet werden.';
-    }
-    trainCaptureInput.value = '';
-  });
-
-  trainSaveBtn.addEventListener('click', () => {
-    if (!currentTrainCapture) return;
-    const name = trainNameInput.value.trim();
-    const value = parseInt(trainValueInput.value, 10);
-    if (!name || !Number.isFinite(value)) {
-      trainStatus.textContent = 'Bitte Name und Punktzahl angeben.';
-      return;
-    }
-    const lib = getCustomLibrary();
-    lib.push({
-      id: 'lib_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
-      hash: currentTrainCapture.hash,
-      thumb: currentTrainCapture.thumb,
-      name, value,
-      wild: !!trainWildInput.checked
-    });
-    saveCustomLibrary(lib);
-    currentTrainCapture = null;
-    trainPreviewWrap.style.display = 'none';
-    trainNameInput.value = ''; trainValueInput.value = ''; trainWildInput.checked = false;
-    trainStatus.textContent = `"${name}" zur Bibliothek hinzugefügt.`;
-    refreshLibraryUI();
-  });
-
-  refreshLibraryUI();
-
 
   // ================= SETUP SCREEN =================
   const countNum = document.getElementById('countNum');
@@ -1043,19 +896,22 @@
       scoreEl.textContent = p.score;
       scoreRow.appendChild(scoreEl);
 
+      const canEdit = isHost || p.id === myClaimedPlayerId;
+
       const roundBadge = document.createElement('div');
       roundBadge.className = 'round-badge' + (p.roundPoints ? ' visible' : '');
       roundBadge.innerHTML = `<span>+${p.roundPoints} diese Runde</span>`;
-      const clearRoundBtn = document.createElement('button');
-      clearRoundBtn.textContent = '✕';
-      clearRoundBtn.title = 'Rundenpunkte zurücksetzen';
-      clearRoundBtn.addEventListener('click', () => {
-        p.roundPoints = 0;
-        renderDashboard();
-        if (isHost) broadcastState();
-        else if (roundAction) roundAction.send({ playerId: p.id, roundPoints: 0 });
-      });
-      roundBadge.appendChild(clearRoundBtn);
+      if (canEdit) {
+        const clearRoundBtn = document.createElement('button');
+        clearRoundBtn.textContent = '✕';
+        clearRoundBtn.title = 'Rundenpunkte zurücksetzen';
+        clearRoundBtn.addEventListener('click', () => {
+          p.roundPoints = 0;
+          renderDashboard();
+          pushState();
+        });
+        roundBadge.appendChild(clearRoundBtn);
+      }
 
       info.appendChild(nameEl);
       info.appendChild(scoreLbl);
@@ -1064,7 +920,6 @@
 
       card.appendChild(info);
 
-      const canEdit = isHost || p.id === myClaimedPlayerId;
       if (canEdit) {
         const addBtn = document.createElement('button');
         addBtn.className = 'player-add-btn' + (p.roundPoints ? ' has-round' : '');
@@ -1090,7 +945,7 @@
   document.getElementById('newGameBtn').addEventListener('click', () => {
     players.forEach(p => { p.score = 0; p.roundPoints = 0; });
     renderDashboard();
-    if (isHost) broadcastState();
+    if (isHost) pushState();
   });
 
   document.getElementById('toggleInviteBtn').addEventListener('click', () => {
@@ -1139,7 +994,7 @@
     setTimeout(() => { checkGameEnd(); }, 750);
 
     // Neuen Punktestand (Runde beendet, Rundenpunkte zurückgesetzt) an alle Mitspieler senden
-    if (isHost) broadcastState();
+    if (isHost) pushState();
   });
 
   function animateCount(el, from, to, duration) {
@@ -1163,7 +1018,7 @@
     const minScore = Math.min(...players.map(p => p.score));
     const winners = players.filter(p => p.score === minScore);
     showEndScreen(winners, minScore);
-    if (isHost) broadcastState({ justEnded: { winners: winners.map(w => ({ name: w.name })), minScore } });
+    if (isHost) pushState({ justEnded: { winnerIds: winners.map(w => w.id), minScore } });
   }
 
   function showEndScreen(winners, minScore) {
@@ -1205,7 +1060,7 @@
     players.forEach(p => { p.score = 0; p.roundPoints = 0; });
     showScreen('dashboard');
     renderDashboard();
-    if (isHost) broadcastState();
+    if (isHost) pushState();
   });
 
   document.getElementById('endBackBtn').addEventListener('click', () => {
@@ -1236,7 +1091,6 @@
     const p = players.find(x => x.id === playerId);
     document.getElementById('counterPlayerName').textContent = p ? p.name : '–';
     hand = [];
-    resetScanUI();
     renderHand();
     showScreen('counter');
   }
@@ -1249,8 +1103,7 @@
     const p = players.find(x => x.id === currentPlayerId);
     if (p) {
       p.roundPoints += total;
-      if (isHost) broadcastState();
-      else if (roundAction) roundAction.send({ playerId: p.id, roundPoints: p.roundPoints });
+      pushState();
     }
     showScreen('dashboard');
     renderDashboard();
@@ -1366,369 +1219,6 @@
   document.getElementById('resetBtn').addEventListener('click', () => { hand = []; renderHand(); });
 
   buildManualGrids();
-
-  // ================= COUNTER: Lokale Foto-Erkennung (Bildvergleich) =================
-  const cameraInput = document.getElementById('cameraInput');
-  const scanPreview = document.getElementById('scanPreview');
-  const previewImg = document.getElementById('previewImg');
-  const analyzeBtn = document.getElementById('analyzeBtn');
-  const discardBtn = document.getElementById('discardBtn');
-  const scanStatus = document.getElementById('scanStatus');
-  const reviewBlock = document.getElementById('reviewBlock');
-  const reviewList = document.getElementById('reviewList');
-  const rejectBtn = document.getElementById('rejectBtn');
-
-  let currentPhotoHash = null;
-
-  cameraInput.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    resetReview();
-    scanStatus.innerHTML = '<span class="spinner"></span>Karte wird erkannt …';
-    try {
-      const { canvas, autoCropped } = await getNormalizedCardCanvas(file);
-      currentPhotoHash = computeDHash(canvas);
-      previewImg.src = `data:image/jpeg;base64,${makeThumbnailB64(canvas, 220)}`;
-      scanPreview.classList.add('visible');
-      scanStatus.textContent = autoCropped
-        ? ''
-        : 'Hinweis: Karte konnte nicht automatisch freigestellt werden – Vergleich nutzt das ganze Foto.';
-      analyzeBtn.disabled = false;
-    } catch (err) {
-      scanStatus.textContent = 'Foto konnte nicht gelesen werden. Bitte erneut versuchen.';
-    }
-  });
-
-  discardBtn.addEventListener('click', () => {
-    currentPhotoHash = null;
-    cameraInput.value = '';
-    scanPreview.classList.remove('visible');
-    scanStatus.textContent = '';
-  });
-
-  analyzeBtn.addEventListener('click', () => {
-    if (!currentPhotoHash) return;
-    const lib = getFullLibrary();
-    if (lib.length === 0) {
-      scanStatus.textContent = 'Keine Referenzkarten vorhanden.';
-      return;
-    }
-
-    const ranked = lib
-      .map(entry => ({ entry, distance: hammingDistance(currentPhotoHash, entry.hash) }))
-      .sort((a, b) => a.distance - b.distance)
-      .slice(0, 3);
-
-    pendingReview = ranked.map(r => ({
-      id: uid++,
-      name: r.entry.name,
-      value: r.entry.value,
-      wild: !!r.entry.wild,
-      similarity: Math.max(0, Math.round((64 - r.distance) / 64 * 100))
-    }));
-
-    scanStatus.textContent = 'Bitte den passenden Treffer antippen (oder "Keiner passt").';
-    renderReview();
-  });
-
-  rejectBtn.addEventListener('click', () => { pendingReview = []; resetScanUI(); });
-
-  function resetReview() {
-    pendingReview = [];
-    reviewBlock.classList.remove('visible');
-    reviewList.innerHTML = '';
-  }
-
-  function resetScanUI() {
-    resetReview();
-    currentPhotoHash = null;
-    cameraInput.value = '';
-    scanPreview.classList.remove('visible');
-    scanStatus.textContent = '';
-    analyzeBtn.disabled = false;
-  }
-
-  function renderReview() {
-    reviewList.innerHTML = '';
-    reviewBlock.classList.add('visible');
-    pendingReview.forEach(c => {
-      const chip = buildChip(`${c.name} (${c.similarity}%)`, c.value, c.wild, null);
-      chip.style.cursor = 'pointer';
-      chip.addEventListener('click', (ev) => {
-        if (ev.target.tagName === 'BUTTON') return;
-        addCard(c.name, c.value, c.wild);
-        resetScanUI();
-      });
-      const removeBtn = chip.querySelector('button');
-      if (removeBtn) removeBtn.remove();
-      reviewList.appendChild(chip);
-    });
-  }
-
-  // ---- Bildverarbeitung: laden, Thumbnail, Perceptual Hash (dHash), Hamming-Distanz ----
-  function loadImageElement(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = () => reject(new Error('Datei konnte nicht gelesen werden'));
-      reader.onload = () => {
-        const img = new Image();
-        img.onerror = () => reject(new Error('Bild konnte nicht geladen werden'));
-        img.onload = () => resolve({ img });
-        img.src = reader.result;
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  function makeThumbnailB64(img, maxDim) {
-    let { width, height } = img;
-    if (width > height && width > maxDim) { height = Math.round(height * (maxDim / width)); width = maxDim; }
-    else if (height > maxDim) { width = Math.round(width * (maxDim / height)); height = maxDim; }
-    const canvas = document.createElement('canvas');
-    canvas.width = width; canvas.height = height;
-    canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-    return canvas.toDataURL('image/jpeg', 0.78).split(',')[1];
-  }
-
-  function computeDHash(img) {
-    const w = 9, h = 8;
-    const canvas = document.createElement('canvas');
-    canvas.width = w; canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0, w, h);
-    const data = ctx.getImageData(0, 0, w, h).data;
-    const gray = [];
-    for (let i = 0; i < w * h; i++) {
-      const r = data[i * 4], g = data[i * 4 + 1], b = data[i * 4 + 2];
-      gray.push(0.299 * r + 0.587 * g + 0.114 * b);
-    }
-    let bits = '';
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w - 1; x++) {
-        bits += gray[y * w + x] < gray[y * w + x + 1] ? '1' : '0';
-      }
-    }
-    return bits; // 64 Zeichen
-  }
-
-  function hammingDistance(a, b) {
-    let dist = 0;
-    const len = Math.min(a.length, b.length);
-    for (let i = 0; i < len; i++) if (a[i] !== b[i]) dist++;
-    return dist + Math.abs(a.length - b.length);
-  }
-
-  // ================= FÄCHERFOTO (experimentell, lokale Kantenerkennung) =================
-  const fanCameraInput = document.getElementById('fanCameraInput');
-  const fanStatus = document.getElementById('fanStatus');
-  const fanResultsEl = document.getElementById('fanResults');
-  const fanActions = document.getElementById('fanActions');
-  const fanAddBtn = document.getElementById('fanAddBtn');
-  const fanDiscardBtn = document.getElementById('fanDiscardBtn');
-
-  let fanDetections = []; // { id, name, value, wild, similarity, thumb, selected }
-
-  function waitForOpenCv(timeoutMs) {
-    return new Promise((resolve, reject) => {
-      const start = Date.now();
-      (function check() {
-        if (typeof cv !== 'undefined' && cv.Mat) { resolve(); return; }
-        if (Date.now() - start > timeoutMs) {
-          reject(new Error('OpenCV.js konnte nicht geladen werden (Internetverbindung für den ersten Ladevorgang nötig)'));
-          return;
-        }
-        setTimeout(check, 200);
-      })();
-    });
-  }
-
-  function drawToWorkCanvas(img, maxDim) {
-    let { width, height } = img;
-    if (width > height && width > maxDim) { height = Math.round(height * (maxDim / width)); width = maxDim; }
-    else if (height > maxDim) { width = Math.round(width * (maxDim / height)); height = maxDim; }
-    const canvas = document.createElement('canvas');
-    canvas.width = width; canvas.height = height;
-    canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-    return canvas;
-  }
-
-  function detectCardRegions(workCanvas) {
-    const src = cv.imread(workCanvas);
-    const gray = new cv.Mat();
-    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-    const blurred = new cv.Mat();
-    cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
-    const edges = new cv.Mat();
-    cv.Canny(blurred, edges, 40, 120);
-    const kernel = cv.Mat.ones(3, 3, cv.CV_8U);
-    cv.dilate(edges, edges, kernel);
-
-    const contours = new cv.MatVector();
-    const hierarchy = new cv.Mat();
-    cv.findContours(edges, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
-
-    const imgArea = workCanvas.width * workCanvas.height;
-    const regions = [];
-
-    for (let i = 0; i < contours.size(); i++) {
-      const cnt = contours.get(i);
-      const area = cv.contourArea(cnt);
-      if (area < imgArea * 0.012 || area > imgArea * 0.35) { cnt.delete(); continue; }
-
-      const rect = cv.minAreaRect(cnt);
-      let w = rect.size.width, h = rect.size.height, ang = rect.angle;
-      if (w > h) { const tmp = w; w = h; h = tmp; ang += 90; }
-      if (w < 18 || h < 18) { cnt.delete(); continue; }
-      const ratio = h / w;
-      if (ratio < 1.2 || ratio > 2.0) { cnt.delete(); continue; }
-
-      regions.push({ cx: rect.center.x, cy: rect.center.y, w, h, angleDeg: ang, area: w * h });
-      cnt.delete();
-    }
-
-    src.delete(); gray.delete(); blurred.delete(); edges.delete(); kernel.delete();
-    contours.delete(); hierarchy.delete();
-
-    // Überlappende Doppel-Erkennungen unterdrücken (größte zuerst behalten)
-    const sorted = regions.sort((a, b) => b.area - a.area);
-    const accepted = [];
-    for (const r of sorted) {
-      const dup = accepted.some(a => {
-        const dx = a.cx - r.cx, dy = a.cy - r.cy;
-        return Math.sqrt(dx * dx + dy * dy) < Math.min(a.w, r.w) * 0.55;
-      });
-      if (!dup) accepted.push(r);
-    }
-    return accepted;
-  }
-
-  function extractCardCanvas(sourceCanvas, r) {
-    const diag = Math.ceil(Math.sqrt(r.w * r.w + r.h * r.h)) + 4;
-    const tmp = document.createElement('canvas');
-    tmp.width = diag; tmp.height = diag;
-    const ctx = tmp.getContext('2d');
-    ctx.save();
-    ctx.translate(diag / 2, diag / 2);
-    ctx.rotate(-r.angleDeg * Math.PI / 180);
-    ctx.translate(-r.cx, -r.cy);
-    ctx.drawImage(sourceCanvas, 0, 0);
-    ctx.restore();
-
-    const out = document.createElement('canvas');
-    out.width = Math.round(r.w); out.height = Math.round(r.h);
-    out.getContext('2d').drawImage(tmp, diag / 2 - r.w / 2, diag / 2 - r.h / 2, r.w, r.h, 0, 0, r.w, r.h);
-    return out;
-  }
-
-  // Versucht, in einem Einzelkarten-Foto genau eine Karte zu finden, freizustellen und
-  // geradezurücken (per OpenCV.js-Kantenerkennung). Fällt bei Fehlschlag auf das
-  // unbeschnittene Foto zurück, damit Training/Erkennung trotzdem funktionieren.
-  async function getNormalizedCardCanvas(file) {
-    const { img } = await loadImageElement(file);
-    try {
-      await waitForOpenCv(6000);
-      const workCanvas = drawToWorkCanvas(img, 1000);
-      const regions = detectCardRegions(workCanvas);
-      if (regions.length > 0) {
-        const best = regions.reduce((a, b) => (a.area > b.area ? a : b));
-        return { canvas: extractCardCanvas(workCanvas, best), autoCropped: true };
-      }
-    } catch (e) {
-      // OpenCV nicht verfügbar (z.B. offline) oder keine Kontur gefunden – Fallback unten
-    }
-    return { canvas: drawToWorkCanvas(img, 500), autoCropped: false };
-  }
-
-  fanCameraInput.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    fanCameraInput.value = '';
-    fanResultsEl.innerHTML = '';
-    fanActions.style.display = 'none';
-    fanDetections = [];
-
-    fanStatus.innerHTML = '<span class="spinner"></span>OpenCV.js wird geladen …';
-    try {
-      await waitForOpenCv(20000);
-    } catch (err) {
-      fanStatus.textContent = err.message;
-      return;
-    }
-
-    fanStatus.innerHTML = '<span class="spinner"></span>Karten werden gesucht …';
-    try {
-      const { img } = await loadImageElement(file);
-      const workCanvas = drawToWorkCanvas(img, 1100);
-      const regions = detectCardRegions(workCanvas);
-
-      if (regions.length === 0) {
-        fanStatus.textContent = 'Keine Kartenkonturen gefunden. Bitte für besseren Kontrast auf einem einfarbigen, dunklen Untergrund erneut versuchen.';
-        return;
-      }
-
-      const lib = getFullLibrary();
-      fanDetections = regions.map(r => {
-        const cardCanvas = extractCardCanvas(workCanvas, r);
-        const hash = computeDHash(cardCanvas);
-        const ranked = lib
-          .map(entry => ({ entry, distance: hammingDistance(hash, entry.hash) }))
-          .sort((a, b) => a.distance - b.distance)[0];
-        const similarity = Math.max(0, Math.round((64 - ranked.distance) / 64 * 100));
-        return {
-          id: uid++,
-          name: ranked.entry.name,
-          value: ranked.entry.value,
-          wild: !!ranked.entry.wild,
-          similarity,
-          thumb: makeThumbnailB64(cardCanvas, 80),
-          selected: similarity >= 55
-        };
-      });
-
-      fanStatus.textContent = `${fanDetections.length} Kartenkontur(en) gefunden – bitte prüfen (schwache Treffer sind abgewählt).`;
-      renderFanResults();
-      fanActions.style.display = 'flex';
-    } catch (err) {
-      console.error(err);
-      fanStatus.textContent = 'Auswertung fehlgeschlagen. Bitte erneut versuchen.';
-    }
-  });
-
-  function renderFanResults() {
-    fanResultsEl.innerHTML = '';
-    fanDetections.forEach(d => {
-      const card = document.createElement('div');
-      card.className = 'fan-card ' + (d.selected ? 'selected' : 'deselected');
-      card.innerHTML = `
-        <img src="data:image/jpeg;base64,${d.thumb}" alt="">
-        <div class="fan-label">${d.name} · ${d.value}</div>
-        <div class="fan-sim">${d.similarity}%</div>
-      `;
-      card.addEventListener('click', () => {
-        d.selected = !d.selected;
-        renderFanResults();
-      });
-      fanResultsEl.appendChild(card);
-    });
-  }
-
-  fanAddBtn.addEventListener('click', () => {
-    fanDetections.filter(d => d.selected).forEach(d => addCard(d.name, d.value, d.wild));
-    fanDetections = [];
-    fanResultsEl.innerHTML = '';
-    fanActions.style.display = 'none';
-    fanStatus.textContent = 'Ausgewählte Karten zur Hand hinzugefügt.';
-  });
-
-  fanDiscardBtn.addEventListener('click', () => {
-    fanDetections = [];
-    fanResultsEl.innerHTML = '';
-    fanActions.style.display = 'none';
-    fanStatus.textContent = '';
-  });
-
-
 
   // ================= APP-UPDATES ERKENNEN =================
   // Registriert den Service Worker, prüft bei jedem Öffnen/Fokussieren aktiv auf eine
