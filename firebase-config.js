@@ -38,10 +38,10 @@
 // ============================================================================
 
 window.FIREBASE_CONFIG = {
-  apiKey: "HIER_DEINEN_API_KEY_EINFÜGEN",
-  authDomain: "DEIN-PROJEKT.firebaseapp.com",
-  projectId: "DEIN-PROJEKT",
-  storageBucket: "DEIN-PROJEKT.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef123456"
+  apiKey: "AIzaSyAjV8afSQogGy1QDzLwJbI2ISGCtUU_Mbc",
+  authDomain: "uno-punktezaehler.firebaseapp.com",
+  projectId: "uno-punktezaehler",
+  storageBucket: "uno-punktezaehler.firebasestorage.app",
+  messagingSenderId: "383899308117",
+  appId: "1:383899308117:web:df81fa3d9e15ad444004dc"
 };
