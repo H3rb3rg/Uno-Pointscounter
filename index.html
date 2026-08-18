@@ -136,6 +136,18 @@
   .dash-header .maxscore-pill { font-size: 0.72rem; opacity: 0.55; }
   .dash-header-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 
+  .dash-icon-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .round-icon-btn {
+    width: 44px; height: 44px; border-radius: 50%; border: none; background: rgba(253,250,243,0.1);
+    color: var(--card-white); font-size: 1.1rem; display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .round-icon-btn:active { transform: translateY(1px); }
+  .round-icon-btn.accent {
+    background: var(--uno-yellow); color: #1a1a1a; font-weight: 900; font-size: 1.5rem;
+    box-shadow: 0 3px 0 var(--uno-yellow-dark);
+  }
+
   body.is-guest .host-only { display: none !important; }
   body:not(.is-guest) .guest-only { display: none !important; }
 
@@ -501,6 +513,74 @@
       <button id="joinCodeBtn">Los</button>
     </div>
     <p id="joinCodeStatus" class="maxscore-hint"></p>
+
+    <div class="pm-section-lbl" style="margin-top:30px;">Meine Gruppen</div>
+    <div id="myGroupsList" class="pm-list"></div>
+
+    <button class="pm-btn-primary" id="newGroupFromListBtn">+ Neue Gruppe erstellen</button>
+    <button class="pm-btn-secondary" id="toggleJoinGroupBtn">Gruppe per Code beitreten</button>
+
+    <div class="pm-join-row" id="joinGroupRow" style="display:none;">
+      <input type="text" id="joinGroupInput" placeholder="z.B. AB3XY" maxlength="5">
+      <button id="joinGroupBtn">Los</button>
+    </div>
+    <p id="joinGroupStatus" class="maxscore-hint"></p>
+  </div>
+
+  <!-- ================= GRUPPE ERSTELLEN ================= -->
+  <div class="screen" id="screen-creategroup">
+    <div class="setup-card">
+      <p class="intro">Feste Gruppe für eine Ewigkeitstabelle über mehrere Spiele hinweg.</p>
+
+      <div class="setup-section-lbl first">Gruppenname</div>
+      <div class="name-input-row" style="margin-bottom: 14px;">
+        <input type="text" id="groupNameInput" placeholder="z.B. Spieleabend-Crew" maxlength="30">
+      </div>
+
+      <div class="setup-section-lbl">Mitgliederanzahl</div>
+      <div class="count-stepper">
+        <button class="stepper-btn" id="groupCountMinus">–</button>
+        <div class="count-display">
+          <div class="num" id="groupCountNum">2</div>
+          <div class="lbl">Mitglieder</div>
+        </div>
+        <button class="stepper-btn" id="groupCountPlus">+</button>
+      </div>
+
+      <div class="setup-section-lbl">Namen</div>
+      <div class="name-inputs" id="groupNameInputs"></div>
+
+      <div class="setup-actions">
+        <button class="btn btn-green" id="createGroupBtn">Gruppe erstellen</button>
+      </div>
+      <div class="setup-actions" style="margin-top:10px;">
+        <button class="btn btn-ghost" id="cancelCreateGroupBtn">Abbrechen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= GRUPPEN-DETAIL: EWIGKEITSTABELLE ================= -->
+  <div class="screen" id="screen-groupdetail">
+    <div class="dash-icon-row">
+      <button class="round-icon-btn" id="backFromGroupBtn" title="Meine Spiele">🏠</button>
+      <div></div>
+      <div></div>
+    </div>
+    <h2 id="groupDetailName" style="margin: 0 0 4px; font-size: 1.1rem; font-weight: 900;">–</h2>
+    <p class="rule-hint" style="margin-bottom: 16px;">Ewigkeitstabelle – wenigste Punkte über alle Spiele = beste Platzierung 👑</p>
+
+    <div class="final-standings">
+      <h3>Gesamtwertung</h3>
+      <div id="eternalTableList"></div>
+    </div>
+
+    <p style="font-size:0.75rem; opacity:0.6; text-align:center; margin: 4px 0 18px;">
+      Gruppen-Code zum Einladen: <strong id="groupDetailCode">–</strong>
+    </p>
+
+    <div class="setup-actions">
+      <button class="btn btn-green" id="startGameInGroupBtn">Neues Spiel in dieser Gruppe starten</button>
+    </div>
   </div>
 
   <!-- ================= SETUP ================= -->
@@ -569,15 +649,15 @@
       </div>
     </div>
 
+    <div class="dash-icon-row">
+      <button class="round-icon-btn" id="backToMyGamesBtn" title="Meine Spiele">🏠</button>
+      <button class="round-icon-btn accent host-only" id="toggleInviteBtn" title="Einladen">+</button>
+      <button class="round-icon-btn host-only" id="editPlayersBtn" title="Spieler / Limit">⚙️</button>
+    </div>
     <div class="dash-header">
       <div>
         <h2>Punktestand</h2>
         <div class="maxscore-pill" id="maxScorePill"></div>
-      </div>
-      <div class="dash-header-actions">
-        <button class="icon-btn" id="backToMyGamesBtn">🏠 Meine Spiele</button>
-        <button class="icon-btn host-only" id="toggleInviteBtn">🔗 Einladen</button>
-        <button class="icon-btn host-only" id="editPlayersBtn">Spieler / Limit</button>
       </div>
     </div>
     <p class="rule-hint">Wenigste Punkte = beste Platzierung 👑</p>
@@ -815,6 +895,182 @@
     });
   }
 
+  // ================= GRUPPEN (dauerhafte Mitgliederliste + Ewigkeitstabelle) =================
+  const MY_GROUPS_KEY = 'unoflex_my_groups';
+  let currentGroupId = null; // Gruppe, mit der das aktuell erstellte/geöffnete Spiel verknüpft ist
+  let pendingGroupLink = null; // Gruppe, aus der heraus gerade "Neues Spiel starten" gedrückt wurde
+
+  function getMyGroups() {
+    try { return JSON.parse(localStorage.getItem(MY_GROUPS_KEY) || '[]'); }
+    catch (e) { return []; }
+  }
+  function saveMyGroups(list) {
+    try { localStorage.setItem(MY_GROUPS_KEY, JSON.stringify(list)); } catch (e) {}
+  }
+  function upsertMyGroup(entry) {
+    const list = getMyGroups().filter(g => g.code !== entry.code);
+    list.unshift(Object.assign({ lastOpened: Date.now() }, entry));
+    saveMyGroups(list);
+  }
+  function removeMyGroup(code) {
+    saveMyGroups(getMyGroups().filter(g => g.code !== code));
+  }
+
+  function renderMyGroupsList() {
+    const groups = getMyGroups();
+    const listEl = document.getElementById('myGroupsList');
+    listEl.innerHTML = '';
+    if (groups.length === 0) {
+      const hint = document.createElement('p');
+      hint.className = 'intro';
+      hint.textContent = 'Noch keine Gruppen auf diesem Gerät.';
+      listEl.appendChild(hint);
+      return;
+    }
+    groups.forEach((g, i) => {
+      const row = document.createElement('div');
+      row.className = 'mygame-row';
+      row.style.setProperty('--pcolor', MYGAME_COLORS[i % MYGAME_COLORS.length]);
+
+      const top = document.createElement('div');
+      top.className = 'mygame-top';
+
+      const info = document.createElement('div');
+      info.className = 'mygame-info';
+      const titleRow = document.createElement('div');
+      titleRow.className = 'mygame-title-row';
+      titleRow.innerHTML = `<span class="mygame-icon">👥</span><span class="mygame-title">${g.name}</span>`;
+      info.appendChild(titleRow);
+
+      const badges = document.createElement('div');
+      badges.className = 'mygame-badges';
+      const memberBadge = document.createElement('span');
+      memberBadge.className = 'mygame-badge count';
+      memberBadge.textContent = `${g.memberCount || '?'} Mitglieder`;
+      badges.appendChild(memberBadge);
+      const codeBadge = document.createElement('span');
+      codeBadge.className = 'mygame-badge';
+      codeBadge.textContent = `Code ${g.code}`;
+      badges.appendChild(codeBadge);
+      info.appendChild(badges);
+
+      const actions = document.createElement('div');
+      actions.className = 'mygame-actions';
+      const openBtn = document.createElement('button');
+      openBtn.className = 'mygame-open-btn';
+      openBtn.textContent = 'Öffnen';
+      openBtn.addEventListener('click', () => openGroupDetail(g.code));
+      const delBtn = document.createElement('button');
+      delBtn.className = 'mygame-del-btn';
+      delBtn.textContent = '✕';
+      delBtn.title = 'Aus der Liste entfernen (löscht die Gruppe nicht)';
+      delBtn.addEventListener('click', () => { removeMyGroup(g.code); renderMyGroupsList(); });
+      actions.appendChild(openBtn);
+      actions.appendChild(delBtn);
+
+      top.appendChild(info);
+      top.appendChild(actions);
+      row.appendChild(top);
+      listEl.appendChild(row);
+    });
+  }
+
+  async function createGroupInFirestore(name, members) {
+    try { await loadFirestore(); }
+    catch (err) { alert('Konnte Gruppe nicht erstellen: ' + err.message); return null; }
+
+    const code = generateRoomCode();
+    const allTime = {};
+    members.forEach(m => { allTime[m] = { games: 0, points: 0, wins: 0 }; });
+    const groupDoc = { name, members, allTime, createdAt: Date.now() };
+
+    try {
+      const ref = firestoreMod.doc(db, 'groups', code);
+      await firestoreMod.setDoc(ref, groupDoc);
+    } catch (err) {
+      alert('Speichern der Gruppe fehlgeschlagen: ' + err.message);
+      return null;
+    }
+    upsertMyGroup({ code, name, memberCount: members.length });
+    return code;
+  }
+
+  async function openGroupDetail(code) {
+    showScreen('groupdetail');
+    document.getElementById('groupDetailName').textContent = 'Lade …';
+    document.getElementById('eternalTableList').innerHTML = '';
+    try {
+      await loadFirestore();
+      const ref = firestoreMod.doc(db, 'groups', code);
+      const snap = await firestoreMod.getDoc(ref);
+      if (!snap.exists()) {
+        document.getElementById('groupDetailName').textContent = 'Gruppe nicht gefunden';
+        return;
+      }
+      const data = snap.data();
+      currentGroupId = code;
+      document.getElementById('groupDetailName').textContent = data.name;
+      document.getElementById('groupDetailCode').textContent = code;
+      renderEternalTable(data);
+      upsertMyGroup({ code, name: data.name, memberCount: data.members.length });
+    } catch (err) {
+      document.getElementById('groupDetailName').textContent = '⚠️ Fehler beim Laden';
+      console.error(err);
+    }
+  }
+
+  function renderEternalTable(data) {
+    const rows = Object.entries(data.allTime || {}).map(([name, stats]) => ({
+      name,
+      games: stats.games || 0,
+      points: stats.points || 0,
+      wins: stats.wins || 0
+    }));
+    rows.sort((a, b) => a.points - b.points);
+
+    const listEl = document.getElementById('eternalTableList');
+    listEl.innerHTML = '';
+    const medals = ['🥇', '🥈', '🥉'];
+    if (rows.length === 0) {
+      const hint = document.createElement('p');
+      hint.className = 'intro';
+      hint.textContent = 'Noch keine abgeschlossenen Spiele in dieser Gruppe.';
+      listEl.appendChild(hint);
+      return;
+    }
+    rows.forEach((r, i) => {
+      const row = document.createElement('div');
+      row.className = 'final-row';
+      row.innerHTML =
+        `<span><span class="medal">${medals[i] || `${i + 1}.`}</span>${r.name}</span>` +
+        `<span>${r.points} Pkt · ${r.wins} Siege · ${r.games} Spiele</span>`;
+      listEl.appendChild(row);
+    });
+  }
+
+  async function updateGroupAllTime(groupCode, finishedPlayers, winners) {
+    try {
+      const ref = firestoreMod.doc(db, 'groups', groupCode);
+      const snap = await firestoreMod.getDoc(ref);
+      if (!snap.exists()) return;
+      const data = snap.data();
+      const allTime = data.allTime || {};
+      const winnerIds = new Set(winners.map(w => w.id));
+
+      finishedPlayers.forEach(p => {
+        const entry = allTime[p.name] || { games: 0, points: 0, wins: 0 };
+        entry.games += 1;
+        entry.points += p.score;
+        if (winnerIds.has(p.id)) entry.wins += 1;
+        allTime[p.name] = entry;
+      });
+
+      await firestoreMod.setDoc(ref, Object.assign({}, data, { allTime }));
+    } catch (err) {
+      console.error('Ewigkeitstabelle konnte nicht aktualisiert werden:', err);
+    }
+  }
+
   async function openSavedGame(entry) {
     currentRoomCode = entry.code;
     isHost = entry.role === 'host';
@@ -841,6 +1097,7 @@
     players = data.players.map(p => ({ ...p }));
     maxScore = data.maxScore;
     claimedMap = data.claimedMap || {};
+    currentGroupId = data.groupId || null;
     lastPushedJson = JSON.stringify(data);
 
     startListening();
@@ -855,6 +1112,7 @@
       players: players.map(p => ({ ...p })),
       maxScore,
       claimedMap,
+      groupId: currentGroupId || null,
       updatedAt: Date.now()
     }, extra || {});
   }
@@ -879,6 +1137,7 @@
     players = data.players.map(p => ({ ...p }));
     maxScore = data.maxScore;
     claimedMap = data.claimedMap || {};
+    currentGroupId = data.groupId || null;
     lastPushedJson = json;
 
     if (data.justEnded) {
@@ -930,7 +1189,10 @@
       setConnStatus('⚠️ ' + err.message + ' Spiel läuft vorerst nur lokal auf diesem Gerät.');
       return;
     }
-    if (!currentRoomCode) currentRoomCode = generateRoomCode();
+    if (!currentRoomCode) {
+      currentRoomCode = generateRoomCode();
+      if (pendingGroupLink) { currentGroupId = pendingGroupLink; pendingGroupLink = null; }
+    }
     await pushState();
     startListening();
     renderInvitePanel();
@@ -969,6 +1231,7 @@
     players = data.players.map(p => ({ ...p }));
     maxScore = data.maxScore;
     claimedMap = data.claimedMap || {};
+    currentGroupId = data.groupId || null;
     lastPushedJson = JSON.stringify(data);
 
     const savedClaimRaw = localStorage.getItem('unoflex_claim_' + currentRoomCode);
@@ -1061,6 +1324,121 @@
   });
   document.getElementById('countPlus').addEventListener('click', () => {
     if (setupCount < 10) { setupCount++; renderNameInputs(); countNum.textContent = setupCount; }
+  });
+
+  // ---- Gruppe erstellen: analoge Namenseingabe wie beim Spiel-Setup ----
+  const groupCountNum = document.getElementById('groupCountNum');
+  const groupNameInputsEl = document.getElementById('groupNameInputs');
+  let groupSetupCount = 2;
+  let groupSetupNames = ['Person 1', 'Person 2'];
+
+  function renderGroupNameInputs() {
+    groupNameInputsEl.innerHTML = '';
+    for (let i = 0; i < groupSetupCount; i++) {
+      const row = document.createElement('div');
+      row.className = 'name-input-row';
+      const swatch = document.createElement('span');
+      swatch.className = 'name-swatch';
+      swatch.style.background = PLAYER_COLORS[i % PLAYER_COLORS.length];
+      row.appendChild(swatch);
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = groupSetupNames[i] || `Person ${i + 1}`;
+      input.placeholder = `Person ${i + 1}`;
+      input.maxLength = 20;
+      input.addEventListener('input', () => { groupSetupNames[i] = input.value; });
+      row.appendChild(input);
+      groupNameInputsEl.appendChild(row);
+    }
+  }
+  renderGroupNameInputs();
+
+  document.getElementById('groupCountMinus').addEventListener('click', () => {
+    if (groupSetupCount > 2) { groupSetupCount--; renderGroupNameInputs(); groupCountNum.textContent = groupSetupCount; }
+  });
+  document.getElementById('groupCountPlus').addEventListener('click', () => {
+    if (groupSetupCount < 20) { groupSetupCount++; renderGroupNameInputs(); groupCountNum.textContent = groupSetupCount; }
+  });
+
+  document.getElementById('newGroupFromListBtn').addEventListener('click', () => {
+    groupSetupCount = 2;
+    groupSetupNames = ['Person 1', 'Person 2'];
+    groupCountNum.textContent = groupSetupCount;
+    document.getElementById('groupNameInput').value = '';
+    renderGroupNameInputs();
+    showScreen('creategroup');
+  });
+
+  document.getElementById('cancelCreateGroupBtn').addEventListener('click', () => {
+    showScreen('mygames');
+    renderMyGroupsList();
+  });
+
+  document.getElementById('createGroupBtn').addEventListener('click', async () => {
+    const name = document.getElementById('groupNameInput').value.trim() || 'Unbenannte Gruppe';
+    const members = [];
+    for (let i = 0; i < groupSetupCount; i++) {
+      const n = (groupSetupNames[i] || `Person ${i + 1}`).trim() || `Person ${i + 1}`;
+      members.push(n);
+    }
+    const btn = document.getElementById('createGroupBtn');
+    btn.disabled = true;
+    btn.textContent = 'Erstelle …';
+    const code = await createGroupInFirestore(name, members);
+    btn.disabled = false;
+    btn.textContent = 'Gruppe erstellen';
+    if (code) openGroupDetail(code);
+  });
+
+  document.getElementById('toggleJoinGroupBtn').addEventListener('click', () => {
+    const row = document.getElementById('joinGroupRow');
+    const nowVisible = row.style.display === 'none';
+    row.style.display = nowVisible ? 'flex' : 'none';
+    if (nowVisible) document.getElementById('joinGroupInput').focus();
+  });
+
+  document.getElementById('joinGroupBtn').addEventListener('click', () => {
+    const code = document.getElementById('joinGroupInput').value.trim().toUpperCase();
+    const statusEl = document.getElementById('joinGroupStatus');
+    if (!code) { statusEl.textContent = 'Bitte einen Code eingeben.'; return; }
+    statusEl.textContent = '';
+    openGroupDetail(code);
+  });
+
+  document.getElementById('joinGroupInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('joinGroupBtn').click();
+  });
+
+  document.getElementById('backFromGroupBtn').addEventListener('click', () => {
+    showScreen('mygames');
+    renderMyGamesList();
+    renderMyGroupsList();
+  });
+
+  document.getElementById('startGameInGroupBtn').addEventListener('click', async () => {
+    if (!currentGroupId) return;
+    try {
+      await loadFirestore();
+      const ref = firestoreMod.doc(db, 'groups', currentGroupId);
+      const snap = await firestoreMod.getDoc(ref);
+      if (!snap.exists()) return;
+      const data = snap.data();
+      pendingGroupLink = currentGroupId;
+      players = [];
+      currentRoomCode = null;
+      myClaimedPlayerId = null;
+      claimedMap = {};
+      isHost = true;
+      document.body.classList.toggle('is-guest', false);
+      setupCount = Math.min(10, Math.max(2, data.members.length));
+      setupNames = data.members.slice(0, setupCount);
+      countNum.textContent = setupCount;
+      renderNameInputs();
+      startBtn.textContent = 'Spiel erstellen';
+      showScreen('setup');
+    } catch (err) {
+      console.error(err);
+    }
   });
 
   const startBtn = document.getElementById('startBtn');
@@ -1258,7 +1636,10 @@
     const minScore = Math.min(...players.map(p => p.score));
     const winners = players.filter(p => p.score === minScore);
     showEndScreen(winners, minScore);
-    if (isHost) pushState({ justEnded: { winnerIds: winners.map(w => w.id), minScore } });
+    if (isHost) {
+      pushState({ justEnded: { winnerIds: winners.map(w => w.id), minScore } });
+      if (currentGroupId) updateGroupAllTime(currentGroupId, players, winners);
+    }
   }
 
   function showEndScreen(winners, minScore) {
@@ -1310,7 +1691,7 @@
 
   // ================= SCREEN SWITCHING =================
   function showScreen(name) {
-    ['setup', 'dashboard', 'counter', 'end', 'joinwait', 'pickplayer', 'mygames'].forEach(s => {
+    ['setup', 'dashboard', 'counter', 'end', 'joinwait', 'pickplayer', 'mygames', 'creategroup', 'groupdetail'].forEach(s => {
       document.getElementById(`screen-${s}`).classList.toggle('active', s === name);
     });
   }
@@ -1328,6 +1709,7 @@
   } else {
     showScreen('mygames');
     renderMyGamesList();
+    renderMyGroupsList();
   }
 
   document.getElementById('newGameFromListBtn').addEventListener('click', () => {
@@ -1335,6 +1717,8 @@
     currentRoomCode = null;
     myClaimedPlayerId = null;
     claimedMap = {};
+    currentGroupId = null;
+    pendingGroupLink = null;
     isHost = true;
     document.body.classList.toggle('is-guest', false);
     setupCount = 2;
@@ -1382,6 +1766,7 @@
     stopListening();
     showScreen('mygames');
     renderMyGamesList();
+    renderMyGroupsList();
   });
 
   function openCounterFor(playerId) {

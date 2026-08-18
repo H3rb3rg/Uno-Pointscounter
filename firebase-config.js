@@ -19,6 +19,9 @@
 //          match /games/{gameId} {
 //            allow read, write: if true;
 //          }
+//          match /groups/{groupId} {
+//            allow read, write: if true;
+//          }
 //        }
 //      }
 //
