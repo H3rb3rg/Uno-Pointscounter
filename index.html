@@ -89,7 +89,7 @@
 
   /* ================= SETUP ================= */
   .setup-card { background: rgba(253,250,243,0.07); border-radius: 18px; padding: 20px; }
-  .setup-card p.intro { margin: 0 0 18px; font-size: 0.88rem; opacity: 0.75; text-align: center; }
+  .setup-card p.intro, p.intro { margin: 0 0 18px; font-size: 0.88rem; opacity: 0.75; text-align: center; color: var(--card-white); }
   .setup-section-lbl {
     font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 800;
     opacity: 0.6; margin: 18px 0 10px 2px;
@@ -147,28 +147,86 @@
   .pick-player-btn:disabled { opacity: 0.4; cursor: default; }
   .pick-player-btn .taken-tag { font-size: 0.7rem; opacity: 0.6; font-weight: 700; margin-left: 8px; }
 
-  .mygame-row {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    background: var(--card-white); border-radius: 12px; padding: 12px 14px;
+  /* ---- "Meine Spiele" im Padelmanager-Stil, mit UNO-Flex-Farbwelt ---- */
+  
+
+  .pm-header { display: flex; align-items: center; gap: 10px; margin: 4px 0 22px; }
+  .pm-dot { width: 22px; height: 22px; border-radius: 50%; background: var(--uno-yellow); flex-shrink: 0; }
+  .pm-title {
+    font-family: 'Arial Black', 'Segoe UI', sans-serif; font-weight: 900; font-size: 1.3rem;
+    letter-spacing: 0.5px; color: var(--card-white);
   }
-  .mygame-info { color: var(--felt-dark); text-align: left; }
-  .mygame-info .mygame-title { font-weight: 800; font-size: 0.9rem; }
-  .mygame-info .mygame-sub { font-size: 0.72rem; opacity: 0.6; margin-top: 2px; }
+  .pm-title .pm-accent { color: var(--uno-yellow); }
+
+  .pm-section-lbl {
+    font-family: 'Arial Black', 'Segoe UI', sans-serif; font-weight: 900; font-size: 1rem;
+    text-transform: uppercase; letter-spacing: 0.5px; color: var(--card-white); opacity: 0.9;
+    margin: 0 0 14px 2px;
+  }
+
+  .pm-list { display: flex; flex-direction: column; gap: 14px; margin-bottom: 22px; }
+
+  .mygame-row {
+    position: relative; background: rgba(253,250,243,0.06); border-radius: 14px;
+    padding: 16px 16px 16px 22px; overflow: hidden;
+  }
+  .mygame-row::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 6px;
+    background: var(--pcolor, var(--uno-yellow));
+  }
+  .mygame-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .mygame-title-row { display: flex; align-items: center; gap: 8px; }
+  .mygame-icon { font-size: 1.1rem; }
+  .mygame-info .mygame-title {
+    font-weight: 900; font-size: 1rem; color: var(--card-white); letter-spacing: 0.2px;
+  }
+  .mygame-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .mygame-badge {
+    font-size: 0.68rem; font-weight: 800; padding: 5px 12px; border-radius: 999px;
+    background: rgba(253,250,243,0.1); color: var(--card-white);
+  }
+  .mygame-badge.count { background: rgba(244,197,48,0.18); color: var(--uno-yellow); }
   .mygame-role {
-    font-size: 0.62rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;
-    padding: 2px 8px; border-radius: 999px; margin-right: 6px;
+    font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.3px;
+    padding: 5px 12px; border-radius: 999px;
   }
   .mygame-role.host { background: var(--uno-red); color: var(--card-white); }
   .mygame-role.guest { background: var(--uno-blue); color: var(--card-white); }
-  .mygame-actions { display: flex; align-items: center; gap: 8px; }
+  .mygame-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
   .mygame-open-btn {
-    background: var(--felt-dark); color: var(--card-white); border: none; border-radius: 999px;
-    padding: 8px 14px; font-size: 0.78rem; font-weight: 800; cursor: pointer;
+    background: var(--card-white); color: var(--felt-dark); border: none; border-radius: 999px;
+    padding: 9px 16px; font-size: 0.78rem; font-weight: 800; cursor: pointer; white-space: nowrap;
   }
   .mygame-del-btn {
-    background: none; border: none; color: var(--felt-dark); opacity: 0.4; font-weight: 900;
-    cursor: pointer; font-size: 0.95rem; padding: 4px;
+    background: none; border: none; color: var(--card-white); opacity: 0.4; font-weight: 900;
+    cursor: pointer; font-size: 1rem; padding: 6px;
   }
+
+  .pm-btn-primary {
+    display: block; width: 100%; background: var(--uno-yellow); color: #1a1a1a; border: none;
+    border-radius: 999px; padding: 16px; font-size: 1rem; font-weight: 900; cursor: pointer;
+    margin-bottom: 12px; box-shadow: 0 3px 0 var(--uno-yellow-dark); text-align: center;
+  }
+  .pm-btn-primary:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--uno-yellow-dark); }
+
+  .pm-btn-secondary {
+    display: block; width: 100%; background: rgba(253,250,243,0.08); color: var(--card-white);
+    border: 2px solid rgba(253,250,243,0.25); border-radius: 999px; padding: 14px; font-size: 0.95rem;
+    font-weight: 800; cursor: pointer; text-align: center;
+  }
+  .pm-btn-secondary:active { transform: translateY(1px); }
+
+  .pm-join-row { display: flex; gap: 8px; margin-top: 12px; }
+  .pm-join-row input {
+    flex: 1; border: none; border-radius: 999px; padding: 12px 16px; font-size: 0.95rem;
+    font-weight: 800; text-align: center; text-transform: uppercase; letter-spacing: 2px;
+    background: var(--card-white); color: var(--felt-dark); outline: none;
+  }
+  .pm-join-row button {
+    background: var(--uno-yellow); color: #1a1a1a; border: none; border-radius: 999px;
+    padding: 12px 20px; font-size: 0.9rem; font-weight: 900; cursor: pointer;
+  }
+
   .icon-btn {
     background: rgba(253,250,243,0.1); border: none; color: var(--card-white); border-radius: 999px;
     padding: 8px 12px; font-size: 0.75rem; font-weight: 700; cursor: pointer;
@@ -427,21 +485,22 @@
 
   <!-- ================= MEINE SPIELE ================= -->
   <div class="screen" id="screen-mygames">
-    <div class="setup-card">
-      <div class="setup-section-lbl first">Einem Spiel per Code beitreten</div>
-      <div class="key-row">
-        <input type="text" id="joinCodeInput" placeholder="z.B. AB3XY" maxlength="5"
-               style="text-transform:uppercase;">
-        <button id="joinCodeBtn">Beitreten</button>
-      </div>
-      <p id="joinCodeStatus" class="maxscore-hint"></p>
-
-      <div class="setup-section-lbl">Deine bisherigen Spiele auf diesem Gerät</div>
-      <div id="myGamesList" style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;"></div>
-      <div class="setup-actions">
-        <button class="btn btn-green" id="newGameFromListBtn">+ Neues Spiel erstellen</button>
-      </div>
+    <div class="pm-header">
+      <span class="pm-dot"></span>
+      <span class="pm-title">UNO<span class="pm-accent">FLEX</span></span>
     </div>
+
+    <div class="pm-section-lbl">Meine Spiele</div>
+    <div id="myGamesList" class="pm-list"></div>
+
+    <button class="pm-btn-primary" id="newGameFromListBtn">+ Neues Spiel erstellen</button>
+    <button class="pm-btn-secondary" id="toggleJoinCodeBtn">Spiel per Code beitreten</button>
+
+    <div class="pm-join-row" id="joinCodeRow" style="display:none;">
+      <input type="text" id="joinCodeInput" placeholder="z.B. AB3XY" maxlength="5">
+      <button id="joinCodeBtn">Los</button>
+    </div>
+    <p id="joinCodeStatus" class="maxscore-hint"></p>
   </div>
 
   <!-- ================= SETUP ================= -->
@@ -686,6 +745,8 @@
     saveMyGames(getMyGames().filter(g => !(g.code === code && g.role === role)));
   }
 
+  const MYGAME_COLORS = [PLAYER_COLORS[0], PLAYER_COLORS[1], PLAYER_COLORS[2], PLAYER_COLORS[3]];
+
   function renderMyGamesList() {
     const games = getMyGames();
     const listEl = document.getElementById('myGamesList');
@@ -697,16 +758,41 @@
       listEl.appendChild(hint);
       return;
     }
-    games.forEach(g => {
+    games.forEach((g, i) => {
       const row = document.createElement('div');
       row.className = 'mygame-row';
+      row.style.setProperty('--pcolor', MYGAME_COLORS[i % MYGAME_COLORS.length]);
+
+      const playerCount = g.label && g.role === 'host' ? g.label.split(',').length : null;
+
+      const top = document.createElement('div');
+      top.className = 'mygame-top';
 
       const info = document.createElement('div');
       info.className = 'mygame-info';
-      info.innerHTML =
-        `<span class="mygame-role ${g.role}">${g.role === 'host' ? 'Spielleiter' : 'Mitspieler'}</span>` +
-        `<span class="mygame-title">${g.label || g.code}</span>` +
-        `<div class="mygame-sub">Code: ${g.code}</div>`;
+      const titleRow = document.createElement('div');
+      titleRow.className = 'mygame-title-row';
+      titleRow.innerHTML =
+        `<span class="mygame-icon">🃏</span><span class="mygame-title">${g.label || g.code}</span>`;
+      info.appendChild(titleRow);
+
+      const badges = document.createElement('div');
+      badges.className = 'mygame-badges';
+      const roleBadge = document.createElement('span');
+      roleBadge.className = `mygame-role ${g.role}`;
+      roleBadge.textContent = g.role === 'host' ? 'Spielleiter' : 'Mitspieler';
+      badges.appendChild(roleBadge);
+      if (playerCount) {
+        const countBadge = document.createElement('span');
+        countBadge.className = 'mygame-badge count';
+        countBadge.textContent = `${playerCount} Spieler`;
+        badges.appendChild(countBadge);
+      }
+      const codeBadge = document.createElement('span');
+      codeBadge.className = 'mygame-badge';
+      codeBadge.textContent = `Code ${g.code}`;
+      badges.appendChild(codeBadge);
+      info.appendChild(badges);
 
       const actions = document.createElement('div');
       actions.className = 'mygame-actions';
@@ -719,11 +805,12 @@
       delBtn.textContent = '✕';
       delBtn.title = 'Aus der Liste entfernen (löscht das Spiel nicht)';
       delBtn.addEventListener('click', () => { removeMyGame(g.code, g.role); renderMyGamesList(); });
-
       actions.appendChild(openBtn);
       actions.appendChild(delBtn);
-      row.appendChild(info);
-      row.appendChild(actions);
+
+      top.appendChild(info);
+      top.appendChild(actions);
+      row.appendChild(top);
       listEl.appendChild(row);
     });
   }
@@ -1256,6 +1343,13 @@
     renderNameInputs();
     startBtn.textContent = 'Spiel erstellen';
     showScreen('setup');
+  });
+
+  document.getElementById('toggleJoinCodeBtn').addEventListener('click', () => {
+    const row = document.getElementById('joinCodeRow');
+    const nowVisible = row.style.display === 'none';
+    row.style.display = nowVisible ? 'flex' : 'none';
+    if (nowVisible) document.getElementById('joinCodeInput').focus();
   });
 
   document.getElementById('joinCodeBtn').addEventListener('click', async () => {
