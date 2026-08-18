@@ -641,8 +641,9 @@
   let claimedMap = {}; // playerId -> true, best-effort, nicht hart erzwungen
   let db = null;
   let firestoreMod = null;
-  let pollTimer = null;
   let lastPushedJson = '';
+
+  let unsubscribeSnapshot = null;
 
   document.body.classList.toggle('is-guest', !isHost);
 
@@ -652,7 +653,8 @@
       throw new Error('firebase-config.js fehlt oder ist nicht ausgefüllt.');
     }
     const appMod = await import('https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js');
-    firestoreMod = await import('https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore-lite.js');
+    // Volle SDK (nicht "lite"), da wir Echtzeit-Listener (onSnapshot) statt reinem Polling nutzen.
+    firestoreMod = await import('https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js');
     const app = appMod.initializeApp(window.FIREBASE_CONFIG);
     db = firestoreMod.getFirestore(app);
     return db;
@@ -754,7 +756,7 @@
     claimedMap = data.claimedMap || {};
     lastPushedJson = JSON.stringify(data);
 
-    startPolling();
+    startListening();
     showScreen('dashboard');
     renderDashboard();
     if (isHost) renderInvitePanel();
@@ -783,39 +785,26 @@
     }
   }
 
-  async function pullState() {
-    if (!db || !currentRoomCode) return;
-    try {
-      const ref = firestoreMod.doc(db, 'games', currentRoomCode);
-      const snap = await firestoreMod.getDoc(ref);
-      if (!snap.exists()) {
-        setConnStatus('⚠️ Spiel wurde nicht gefunden (evtl. gelöscht).');
-        return;
-      }
-      const data = snap.data();
-      const json = JSON.stringify(data);
-      if (json === lastPushedJson) { setConnStatus(); return; } // eigene Änderung, nichts Neues
+  function applyRemoteData(data) {
+    const json = JSON.stringify(data);
+    if (json === lastPushedJson) { setConnStatus(); return; } // eigene Änderung, nichts Neues
 
-      players = data.players.map(p => ({ ...p }));
-      maxScore = data.maxScore;
-      claimedMap = data.claimedMap || {};
-      lastPushedJson = json;
+    players = data.players.map(p => ({ ...p }));
+    maxScore = data.maxScore;
+    claimedMap = data.claimedMap || {};
+    lastPushedJson = json;
 
-      if (data.justEnded) {
-        showEndScreen(
-          players.filter(p => data.justEnded.winnerIds.includes(p.id)),
-          data.justEnded.minScore
-        );
-      } else if (document.getElementById('screen-dashboard').classList.contains('active')) {
-        renderDashboard();
-      } else if (document.getElementById('screen-pickplayer').classList.contains('active')) {
-        renderPickPlayerList();
-      }
-      setConnStatus();
-    } catch (err) {
-      console.error(err);
-      setConnStatus('⚠️ Verbindung zu Firebase fehlgeschlagen.');
+    if (data.justEnded) {
+      showEndScreen(
+        players.filter(p => data.justEnded.winnerIds.includes(p.id)),
+        data.justEnded.minScore
+      );
+    } else if (document.getElementById('screen-dashboard').classList.contains('active')) {
+      renderDashboard();
+    } else if (document.getElementById('screen-pickplayer').classList.contains('active')) {
+      renderPickPlayerList();
     }
+    setConnStatus();
   }
 
   function setConnStatus(customMsg) {
@@ -823,12 +812,28 @@
     if (!el) return;
     if (customMsg) { el.textContent = customMsg; return; }
     const time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    el.textContent = `🟢 Synchronisiert (zuletzt ${time})`;
+    el.textContent = `🟢 Live verbunden (zuletzt ${time})`;
   }
 
-  function startPolling() {
-    if (pollTimer) clearInterval(pollTimer);
-    pollTimer = setInterval(pullState, 3500);
+  // Echtzeit-Listener: reagiert praktisch sofort, sobald sich das Dokument ändert
+  // (durch uns selbst oder durch andere Mitspieler) - kein Warten auf ein Zeitintervall mehr.
+  function startListening() {
+    if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+    const ref = firestoreMod.doc(db, 'games', currentRoomCode);
+    unsubscribeSnapshot = firestoreMod.onSnapshot(ref, (snap) => {
+      if (!snap.exists()) {
+        setConnStatus('⚠️ Spiel wurde nicht gefunden (evtl. gelöscht).');
+        return;
+      }
+      applyRemoteData(snap.data());
+    }, (err) => {
+      console.error(err);
+      setConnStatus('⚠️ Verbindung zu Firebase unterbrochen – versuche erneut …');
+    });
+  }
+
+  function stopListening() {
+    if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
   }
 
   async function hostCreateOrUpdateRoom() {
@@ -840,7 +845,7 @@
     }
     if (!currentRoomCode) currentRoomCode = generateRoomCode();
     await pushState();
-    startPolling();
+    startListening();
     renderInvitePanel();
     setConnStatus();
     upsertMyGame({ code: currentRoomCode, role: 'host', label: players.map(p => p.name).join(', ') });
@@ -895,7 +900,7 @@
     } else {
       showPickPlayerScreen();
     }
-    startPolling();
+    startListening();
     setConnStatus();
   }
 
@@ -1280,7 +1285,7 @@
   });
 
   document.getElementById('backToMyGamesBtn').addEventListener('click', () => {
-    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    stopListening();
     showScreen('mygames');
     renderMyGamesList();
   });
