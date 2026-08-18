@@ -146,6 +146,29 @@
   }
   .pick-player-btn:disabled { opacity: 0.4; cursor: default; }
   .pick-player-btn .taken-tag { font-size: 0.7rem; opacity: 0.6; font-weight: 700; margin-left: 8px; }
+
+  .mygame-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: var(--card-white); border-radius: 12px; padding: 12px 14px;
+  }
+  .mygame-info { color: var(--felt-dark); text-align: left; }
+  .mygame-info .mygame-title { font-weight: 800; font-size: 0.9rem; }
+  .mygame-info .mygame-sub { font-size: 0.72rem; opacity: 0.6; margin-top: 2px; }
+  .mygame-role {
+    font-size: 0.62rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;
+    padding: 2px 8px; border-radius: 999px; margin-right: 6px;
+  }
+  .mygame-role.host { background: var(--uno-red); color: var(--card-white); }
+  .mygame-role.guest { background: var(--uno-blue); color: var(--card-white); }
+  .mygame-actions { display: flex; align-items: center; gap: 8px; }
+  .mygame-open-btn {
+    background: var(--felt-dark); color: var(--card-white); border: none; border-radius: 999px;
+    padding: 8px 14px; font-size: 0.78rem; font-weight: 800; cursor: pointer;
+  }
+  .mygame-del-btn {
+    background: none; border: none; color: var(--felt-dark); opacity: 0.4; font-weight: 900;
+    cursor: pointer; font-size: 0.95rem; padding: 4px;
+  }
   .icon-btn {
     background: rgba(253,250,243,0.1); border: none; color: var(--card-white); border-radius: 999px;
     padding: 8px 12px; font-size: 0.75rem; font-weight: 700; cursor: pointer;
@@ -402,8 +425,27 @@
 <div class="app">
   <h1><span class="uno">UNO</span>Flex Punktezähler</h1>
 
+  <!-- ================= MEINE SPIELE ================= -->
+  <div class="screen" id="screen-mygames">
+    <div class="setup-card">
+      <div class="setup-section-lbl first">Einem Spiel per Code beitreten</div>
+      <div class="key-row">
+        <input type="text" id="joinCodeInput" placeholder="z.B. AB3XY" maxlength="5"
+               style="text-transform:uppercase;">
+        <button id="joinCodeBtn">Beitreten</button>
+      </div>
+      <p id="joinCodeStatus" class="maxscore-hint"></p>
+
+      <div class="setup-section-lbl">Deine bisherigen Spiele auf diesem Gerät</div>
+      <div id="myGamesList" style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;"></div>
+      <div class="setup-actions">
+        <button class="btn btn-green" id="newGameFromListBtn">+ Neues Spiel erstellen</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ================= SETUP ================= -->
-  <div class="screen active" id="screen-setup">
+  <div class="screen" id="screen-setup">
     <div class="setup-card">
       <p class="intro">Wie viele Spieler:innen sind dabei? Namen und Höchstpunktzahl kannst du jederzeit anpassen.</p>
 
@@ -474,6 +516,7 @@
         <div class="maxscore-pill" id="maxScorePill"></div>
       </div>
       <div class="dash-header-actions">
+        <button class="icon-btn" id="backToMyGamesBtn">🏠 Meine Spiele</button>
         <button class="icon-btn host-only" id="toggleInviteBtn">🔗 Einladen</button>
         <button class="icon-btn host-only" id="editPlayersBtn">Spieler / Limit</button>
       </div>
@@ -622,6 +665,102 @@
     return code;
   }
 
+  // ---- Lokale Registry "Meine Spiele" (nur eine Merkliste auf diesem Gerät, nicht die Datenquelle) ----
+  const MY_GAMES_KEY = 'unoflex_my_games';
+
+  function getMyGames() {
+    try { return JSON.parse(localStorage.getItem(MY_GAMES_KEY) || '[]'); }
+    catch (e) { return []; }
+  }
+  function saveMyGames(list) {
+    try { localStorage.setItem(MY_GAMES_KEY, JSON.stringify(list)); } catch (e) {}
+  }
+  function upsertMyGame(entry) {
+    const list = getMyGames().filter(g => !(g.code === entry.code && g.role === entry.role));
+    list.unshift(Object.assign({ lastOpened: Date.now() }, entry));
+    saveMyGames(list);
+  }
+  function removeMyGame(code, role) {
+    saveMyGames(getMyGames().filter(g => !(g.code === code && g.role === role)));
+  }
+
+  function renderMyGamesList() {
+    const games = getMyGames();
+    const listEl = document.getElementById('myGamesList');
+    listEl.innerHTML = '';
+    if (games.length === 0) {
+      const hint = document.createElement('p');
+      hint.className = 'intro';
+      hint.textContent = 'Noch keine gespeicherten Spiele auf diesem Gerät.';
+      listEl.appendChild(hint);
+      return;
+    }
+    games.forEach(g => {
+      const row = document.createElement('div');
+      row.className = 'mygame-row';
+
+      const info = document.createElement('div');
+      info.className = 'mygame-info';
+      info.innerHTML =
+        `<span class="mygame-role ${g.role}">${g.role === 'host' ? 'Spielleiter' : 'Mitspieler'}</span>` +
+        `<span class="mygame-title">${g.label || g.code}</span>` +
+        `<div class="mygame-sub">Code: ${g.code}</div>`;
+
+      const actions = document.createElement('div');
+      actions.className = 'mygame-actions';
+      const openBtn = document.createElement('button');
+      openBtn.className = 'mygame-open-btn';
+      openBtn.textContent = 'Öffnen';
+      openBtn.addEventListener('click', () => openSavedGame(g));
+      const delBtn = document.createElement('button');
+      delBtn.className = 'mygame-del-btn';
+      delBtn.textContent = '✕';
+      delBtn.title = 'Aus der Liste entfernen (löscht das Spiel nicht)';
+      delBtn.addEventListener('click', () => { removeMyGame(g.code, g.role); renderMyGamesList(); });
+
+      actions.appendChild(openBtn);
+      actions.appendChild(delBtn);
+      row.appendChild(info);
+      row.appendChild(actions);
+      listEl.appendChild(row);
+    });
+  }
+
+  async function openSavedGame(entry) {
+    currentRoomCode = entry.code;
+    isHost = entry.role === 'host';
+    myClaimedPlayerId = entry.playerId || null;
+    document.body.classList.toggle('is-guest', !isHost);
+
+    showScreen('joinwait');
+    document.getElementById('joinWaitText').textContent = `Öffne Spiel ${entry.code} …`;
+
+    try {
+      await loadFirestore();
+    } catch (err) {
+      document.getElementById('joinWaitText').textContent = '⚠️ ' + err.message;
+      return;
+    }
+    const ref = firestoreMod.doc(db, 'games', currentRoomCode);
+    const snap = await firestoreMod.getDoc(ref);
+    if (!snap.exists()) {
+      document.getElementById('joinWaitText').textContent =
+        'Dieses Spiel wurde nicht gefunden (evtl. gelöscht). Du kannst es unten aus der Liste entfernen.';
+      return;
+    }
+    const data = snap.data();
+    players = data.players.map(p => ({ ...p }));
+    maxScore = data.maxScore;
+    claimedMap = data.claimedMap || {};
+    lastPushedJson = JSON.stringify(data);
+
+    startPolling();
+    showScreen('dashboard');
+    renderDashboard();
+    if (isHost) renderInvitePanel();
+    setConnStatus();
+  }
+
   function buildStateSnapshot(extra) {
     return Object.assign({
       players: players.map(p => ({ ...p })),
@@ -704,6 +843,7 @@
     startPolling();
     renderInvitePanel();
     setConnStatus();
+    upsertMyGame({ code: currentRoomCode, role: 'host', label: players.map(p => p.name).join(', ') });
   }
 
   function renderInvitePanel() {
@@ -743,9 +883,13 @@
     const savedClaim = savedClaimRaw !== null ? Number(savedClaimRaw) : null;
     if (savedClaim !== null && players.some(p => p.id === savedClaim)) {
       myClaimedPlayerId = savedClaim;
-      document.getElementById('guestRoleHint').textContent =
-        `Du zählst als: ${players.find(p => p.id === savedClaim).name}`;
+      const me = players.find(p => p.id === savedClaim);
+      document.getElementById('guestRoleHint').textContent = `Du zählst als: ${me.name}`;
       document.getElementById('guestRoleHint').style.display = 'block';
+      upsertMyGame({
+        code: currentRoomCode, role: 'guest', playerId: savedClaim,
+        label: `${me.name} (bei ${players.map(x => x.name).join(', ')})`
+      });
       showScreen('dashboard');
       renderDashboard();
     } else {
@@ -776,6 +920,10 @@
         await pushState();
         document.getElementById('guestRoleHint').textContent = `Du zählst als: ${p.name}`;
         document.getElementById('guestRoleHint').style.display = 'block';
+        upsertMyGame({
+          code: currentRoomCode, role: 'guest', playerId: p.id,
+          label: `${p.name} (bei ${players.map(x => x.name).join(', ')})`
+        });
         showScreen('dashboard');
         renderDashboard();
       });
@@ -1070,12 +1218,13 @@
 
   // ================= SCREEN SWITCHING =================
   function showScreen(name) {
-    ['setup', 'dashboard', 'counter', 'end', 'joinwait', 'pickplayer'].forEach(s => {
+    ['setup', 'dashboard', 'counter', 'end', 'joinwait', 'pickplayer', 'mygames'].forEach(s => {
       document.getElementById(`screen-${s}`).classList.toggle('active', s === name);
     });
   }
 
-  // Beitritts-Modus: sofort verbinden statt Setup zu zeigen
+  // Beitritts-Modus: sofort verbinden statt Setup zu zeigen. Sonst immer "Meine Spiele" zeigen
+  // (auch leer) - dort kann man ein neues Spiel starten oder per Code beitreten.
   if (joinCodeFromUrl) {
     showScreen('joinwait');
     document.getElementById('joinWaitText').textContent = `Verbinde mit Spiel ${joinCodeFromUrl} …`;
@@ -1084,7 +1233,57 @@
       document.getElementById('joinWaitText').textContent =
         'Verbindung fehlgeschlagen. Bitte Link/QR-Code erneut versuchen oder prüfen, ob der Spielleiter das Spiel noch geöffnet hat.';
     });
+  } else {
+    showScreen('mygames');
+    renderMyGamesList();
   }
+
+  document.getElementById('newGameFromListBtn').addEventListener('click', () => {
+    players = [];
+    currentRoomCode = null;
+    myClaimedPlayerId = null;
+    claimedMap = {};
+    isHost = true;
+    document.body.classList.toggle('is-guest', false);
+    setupCount = 2;
+    setupNames = ['Spieler 1', 'Spieler 2'];
+    countNum.textContent = setupCount;
+    renderNameInputs();
+    startBtn.textContent = 'Spiel erstellen';
+    showScreen('setup');
+  });
+
+  document.getElementById('joinCodeBtn').addEventListener('click', async () => {
+    const input = document.getElementById('joinCodeInput');
+    const statusEl = document.getElementById('joinCodeStatus');
+    const code = input.value.trim().toUpperCase();
+    if (!code) { statusEl.textContent = 'Bitte einen Code eingeben.'; return; }
+
+    isHost = false;
+    myClaimedPlayerId = null;
+    document.body.classList.toggle('is-guest', true);
+    statusEl.textContent = '';
+    showScreen('joinwait');
+    document.getElementById('joinWaitText').textContent = `Verbinde mit Spiel ${code} …`;
+
+    try {
+      await guestJoinRoom(code);
+    } catch (err) {
+      console.error(err);
+      document.getElementById('joinWaitText').textContent =
+        'Verbindung fehlgeschlagen. Bitte Code prüfen oder beim Spielleiter nachfragen.';
+    }
+  });
+
+  document.getElementById('joinCodeInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('joinCodeBtn').click();
+  });
+
+  document.getElementById('backToMyGamesBtn').addEventListener('click', () => {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    showScreen('mygames');
+    renderMyGamesList();
+  });
 
   function openCounterFor(playerId) {
     currentPlayerId = playerId;
